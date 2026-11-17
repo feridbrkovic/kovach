@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 
@@ -94,11 +95,16 @@ export class Workspace {
     let files: string[] | undefined;
     try {
       if (await this.ignoredByParent()) {
-        const { stdout } = await run("rg", ["--files", "--hidden", "--no-ignore-parent", "--no-require-git", "-g", "!.git/", "-0"], {
-          cwd: this.root,
-          maxBuffer: 64 * 1024 * 1024,
-        });
-        files = stdout.split("\0").filter(Boolean);
+        try {
+          const { stdout } = await run("rg", ["--files", "--hidden", "--no-ignore-parent", "--no-require-git", "-g", "!.git/", "-0"], {
+            cwd: this.root,
+            maxBuffer: 64 * 1024 * 1024,
+          });
+          files = stdout.split("\0").filter(Boolean);
+        } catch (err) {
+          if ((err as { code?: number | string }).code !== "ENOENT") throw err;
+          files = await this.listStandalone(); // no ripgrep on this machine
+        }
       } else {
         const { stdout } = await run("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], {
           cwd: this.root,
@@ -116,6 +122,24 @@ export class Workspace {
       .filter((f) => existsSync(join(this.root, f)))
       .sort()
       .slice(0, limit);
+  }
+
+  /**
+   * The project's files by its own .gitignore files only, without ripgrep: git is pointed at an
+   * empty repository with the project as its work tree, so no enclosing repository's rules apply.
+   */
+  private async listStandalone(): Promise<string[]> {
+    const gitDir = mkdtempSync(join(tmpdir(), "kovach-list-"));
+    try {
+      await run("git", ["init", "-q", "--bare", gitDir]);
+      const { stdout } = await run("git", ["--git-dir", gitDir, "--work-tree", this.root, "ls-files", "--others", "--exclude-standard", "-z"], {
+        cwd: this.root,
+        maxBuffer: 64 * 1024 * 1024,
+      });
+      return stdout.split("\0").filter(Boolean);
+    } finally {
+      rmSync(gitDir, { recursive: true, force: true });
+    }
   }
 
   private walk(): string[] {
