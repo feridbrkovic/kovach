@@ -153,7 +153,7 @@ pnpm install
 pnpm --filter @kovach-dev/desktop dev   # or double-click scripts/start-mac.command
 ```
 
-Start oMLX with the model loaded first. Node 22 or newer.
+The model (about 20 GB) is downloaded with `scripts/get-model.command` into oMLX's model folder; run it again to resume an interrupted download. Start oMLX with the model loaded first. Node 22 or newer.
 
 To build an unsigned DMG for your own Mac, run `scripts/build-dmg.command`.
 
