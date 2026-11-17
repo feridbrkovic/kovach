@@ -1,0 +1,24 @@
+{
+  "name": "@kovach-dev/agent-fixtures",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Record agent sessions as JSONL fixtures and replay them with a scripted model",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@kovach-dev/memory-contract": "workspace:*",
+    "zod": "^4.1.12"
+  }
+}
