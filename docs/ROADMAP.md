@@ -85,6 +85,7 @@ Working checklist for [MASTER_PLAN.md](../MASTER_PLAN.md). Tick items as they la
   - [x] Model safeguards recorded in `docs/MODEL_NOTES.md` (sampling, retries, repetition and identical-call guards, context trimming, read-only requests)
   - [ ] A full mobile run on the current code, launched in the iOS simulator
   - [ ] Visual check for Expo apps (web export, screenshots of each tab) so the agent sees its screens as it does web pages
+  - [x] App kit: sample data per feature until a server exists (`sample.ts`, `env.sampleData`, `EXPO_PUBLIC_SAMPLE_DATA=1` for exported previews); the loop checks the server calls are still there
   - [ ] App kit: forms, pagination, an action on the detail screen, tests (jest-expo)
   - [ ] Generated pages: fonts stored with the page instead of loaded from Google
   - [x] "Allow for this session" covers commands of the same kind (`npx tsc …`, `npm run test …`), shown on the button; commands that add code, delete, publish or lean on the shell are still remembered exactly

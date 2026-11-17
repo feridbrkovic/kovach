@@ -4,6 +4,7 @@ import { type Check, detectChecks } from "./checks.js";
 import { ModelError, textOf } from "./model.js";
 import type { ChatMessage, ChatModel, ChatResponse, ContentPart, ImagePart, ToolCallRequest } from "./model.js";
 import { unifiedDiff } from "./diff.js";
+import { kitFindings } from "./app-kit.js";
 import { pickPlaybooks, renderPlaybooks, wantsNewApp, wantsNewPage } from "./playbooks.js";
 import { planPrompt, SYSTEM_PROMPT } from "./prompt.js";
 import { formatIssue, type ReviewIssue, reviewChange, reviewNudge } from "./review.js";
@@ -211,6 +212,9 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
   /** Kinds of non-answer already sent back (each once per run). */
   const actNudges = new Set<string>();
   let askedForAnswer = false;
+  /** Features the app kit set up in this run; checked before finishing (see sentBackByKit). */
+  let kitFeatures: string[] | undefined;
+  let kitChecked = false;
   /** A new web page: the first step is the page builder, and only it is offered until it has run. */
   let buildWithKit = false;
   let kitTurns = 0;
@@ -371,7 +375,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
       // 2a. No tool calls: the model thinks it is done. Checks decide.
       if (res.toolCalls.length === 0) {
         if (!edited || checks.length === 0 || greenSinceLastEdit) {
-          if ((await sentBackByLook()) || (await sentBackByReview()) || sentBackForAnswer(res.content)) continue;
+          if ((await sentBackByLook()) || sentBackByKit() || (await sentBackByReview()) || sentBackForAnswer(res.content)) continue;
           return finish("done", res.content);
         }
         emit({ type: "tool_start", name: "run_checks", args: {} });
@@ -382,7 +386,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
         emit({ type: "checks", runs, passed });
         if (passed) {
           greenSinceLastEdit = true;
-          if ((await sentBackByLook()) || (await sentBackByReview()) || sentBackForAnswer(res.content)) continue;
+          if ((await sentBackByLook()) || sentBackByKit() || (await sentBackByReview()) || sentBackForAnswer(res.content)) continue;
           return finish("done", res.content);
         }
         if (options.allowFailingChecks) return finish("done_with_failing_checks", res.content);
@@ -456,6 +460,10 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
           });
         }
         if (outcome.ok && "args" in p) succeeded.add(p.call.name);
+        if (outcome.ok && p.call.name === "app_kit" && "args" in p) {
+          const given = (p.args as { features?: { name?: unknown }[] }).features ?? [];
+          kitFeatures = given.map((f) => String(f.name)).filter(Boolean);
+        }
         // The app kit names the packages its files import. They are installed here, with Expo's
         // installer, so versions match the SDK: the model reaches for pnpm or plain npm instead.
         const install = outcome.ok && p.call.name === "app_kit" ? /`(npx expo install [^`]+)`/.exec(outcome.content)?.[1] : undefined;
@@ -500,13 +508,44 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
 
   // -- helpers ----------------------------------------------------------------
 
-  /** Files changed but the answer is only "Done.": the user is owed what was built. Once per run. */
+  /**
+   * Files changed but the answer is only "Done.": the user is owed what was built. Or the "answer"
+   * is an error message nothing returned (seen live: a run ended on `API Error: 403 {"error":…}`
+   * after a failed edit). Once per run.
+   */
   function sentBackForAnswer(content: string): boolean {
-    if (askedForAnswer || originals.size === 0 || !EMPTY_ANSWER.test(content.trim())) return false;
+    if (askedForAnswer) return false;
+    const errorText = isErrorText(content);
+    if (!errorText && (originals.size === 0 || !EMPTY_ANSWER.test(content.trim()))) return false;
     askedForAnswer = true;
-    const nudge = "Give your final answer now, without tools: what you built or changed, the files, how to open or run it, and anything left in [square brackets] for the user to fill in.";
+    const nudge = errorText
+      ? "That reads like an error message, and no tool in this run returned it. If your last step failed, read the file again and redo it. Then give your final answer: what you built or changed, what didn't work and at which step, how to open or run it, and what is left for the user."
+      : "Give your final answer now, without tools: what you built or changed, the files, how to open or run it, and anything left in [square brackets] for the user to fill in.";
     messages.push({ role: "user", content: nudge });
     record("tool", nudge);
+    return true;
+  }
+
+  /**
+   * Before finishing a run in which the app kit set up features: each feature must still talk to
+   * the server. The model swaps the calls for hard-coded data so the app "works" without a
+   * backend, although the kit already shows sample data in development. Once per run.
+   */
+  function sentBackByKit(): boolean {
+    if (kitChecked || !kitFeatures?.length) return false;
+    kitChecked = true;
+    const read = (path: string) => {
+      try {
+        return workspace.readText(path);
+      } catch {
+        return undefined;
+      }
+    };
+    const findings = kitFindings(read, kitFeatures);
+    if (findings.length === 0) return false;
+    const note = `Before you finish:\n${findings.map((f) => `- ${f}`).join("\n")}\nFix this, run the checks again, then give your answer.`;
+    messages.push({ role: "user", content: note });
+    record("tool", note);
     return true;
   }
 
@@ -698,6 +737,13 @@ export function progressEvent(p: import("./model.js").ModelProgress): Extract<Ag
 }
 
 /** A final answer that says nothing about the work. */
+/** A reply that is only an error line ("API Error: 403 {…}", `{"error": …}`), not an answer. */
+export function isErrorText(content: string): boolean {
+  const text = content.trim();
+  if (!text || text.length > 400) return false;
+  return /^(api\s+)?error\b\s*:?\s*\d{3}\b/i.test(text) || /^\{\s*"error"\s*:/.test(text) || /^(http\s+)?[45]\d{2}\s+(unauthorized|forbidden|not found|bad request|internal server error)\b/i.test(text);
+}
+
 const EMPTY_ANSWER = /^(all )?(done|finished|complete|completed|ok|okay|ready)[.!]*$/i;
 
 /** A reply that is a plan in the loop's own format ("Plan: …" and numbered steps), not an answer. */

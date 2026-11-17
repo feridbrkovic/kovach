@@ -21,12 +21,47 @@ export const AppKitInput = z.object({
     .describe("Reverse-domain identifier used on both stores, e.g. 'ba.input.barber'. Leave it out when the user hasn't given one: a placeholder made from the name is used and reported. Don't stop to ask for it"),
   auth: z.boolean().default(false).describe("true when users sign in"),
   features: z
-    .array(z.object({ name: z.string().regex(/^[a-z][a-z0-9-]*$/).describe("kebab-case, e.g. 'bookings'"), purpose: z.string().min(3).max(120) }))
+    .array(
+      z.object({
+        name: z.string().regex(/^[a-z][a-z0-9-]*$/).describe("kebab-case, e.g. 'bookings'"),
+        purpose: z.string().min(3).max(120),
+        samples: z
+          .array(z.object({ title: z.string().min(1).max(60), subtitle: z.string().max(80).optional(), status: z.string().max(20).optional() }))
+          .max(8)
+          .optional()
+          .describe("3 to 6 realistic items for this area, e.g. for bookings: title 'Classic cut', subtitle 'Sat 5 Dec, 11:00 · Amar', status 'Confirmed'. The app shows them in development until the server exists, so the real calls never have to be replaced with made-up data"),
+      }),
+    )
     .min(1)
     .max(8)
     .describe("The app's main areas; each gets a feature folder with its data access, hook and screen"),
 });
 export type AppKitInput = z.output<typeof AppKitInput>;
+
+/** Given with the kit's result so the parts can be used without opening each file. */
+const PARTS = `Build screens from these parts (import each from "@/components/ui/<file>"); you don't need to read their files first:
+- Screen { children, scroll? = true } from screen: safe areas, padding, background.
+- AppText { variant? = "body", tone? = "text" | "muted" | "danger" | "onPrimary", ...Text props } from app-text; variants are the keys of scale in src/theme/tokens.ts.
+- Button { label, onPress, variant? = "primary" | "secondary", loading?, disabled? } from button.
+- TextField { label, error?, ...TextInput props } from text-field.
+- SearchField { value, onChangeText, placeholder? } from search-field.
+- Card { children, ...View props } from card.
+- ListItem { title, subtitle?, leading?, trailing?, onPress? } from list-item; Avatar { name, uri?, size? } from avatar; Badge { label, tone? } from badge.
+- SectionHeader { title, detail? } from section-header.
+- Loading, Empty { title, hint? }, Failed { message, onRetry? } from states.
+Colours, spacing, radii and text sizes come from src/theme/tokens.ts; don't restyle from scratch.`;
+
+/** What a finished app must still have: each feature's api.ts talking to the server through request(). */
+export function kitFindings(read: (path: string) => string | undefined, features: string[]): string[] {
+  const findings: string[] = [];
+  for (const name of features) {
+    const path = `src/features/${name}/api.ts`;
+    const api = read(path);
+    if (api === undefined) continue; // the feature was renamed or removed on purpose
+    if (!/\brequest\s*\(/.test(api)) findings.push(`${path} no longer calls the server: it has no request() call. Put the calls back (request from "@/lib/api") and keep made-up data in src/features/${name}/sample.ts, which development builds already show.`);
+  }
+  return findings;
+}
 
 /** Used until the user names their own: valid on both stores, and plainly a placeholder. */
 export function placeholderBundleId(name: string): string {
@@ -52,14 +87,25 @@ export function kitFiles(input: AppKitInput): Record<string, string> {
 const schema = z.object({ EXPO_PUBLIC_API_URL: z.string().url() });
 const parsed = schema.safeParse({ EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL });
 
-if (!parsed.success) {
-  // A release build without its server address must not ship: it would talk to the placeholder below.
+/** The address in .env.example: no server answers there. */
+const PLACEHOLDER = "https://api.example.com";
+const apiUrl = (parsed.success ? parsed.data.EXPO_PUBLIC_API_URL : PLACEHOLDER).replace(/\\/+$/, "");
+/** Set to "1" to show the sample data in an exported build too (previews and screenshots only). */
+const sampleAsked = process.env.EXPO_PUBLIC_SAMPLE_DATA === "1";
+
+if (apiUrl === PLACEHOLDER && !sampleAsked) {
+  // A release build without its server address must not ship: it would talk to the placeholder.
   if (!__DEV__) throw new Error("EXPO_PUBLIC_API_URL is not set for this build.");
-  console.warn("EXPO_PUBLIC_API_URL is missing or not a URL. Copy .env.example to .env and restart.");
+  console.warn("EXPO_PUBLIC_API_URL is not set: showing the sample data in each feature's sample.ts. Copy .env.example to .env and set the real address to talk to the server.");
 }
 
 export const env = {
-  apiUrl: (parsed.success ? parsed.data.EXPO_PUBLIC_API_URL : "https://api.example.com").replace(/\\/+$/, ""),
+  apiUrl,
+  /**
+   * True while there is no server to talk to: development builds without a real EXPO_PUBLIC_API_URL.
+   * Each feature's api.ts then answers from its sample.ts; the real calls stay in place beside it.
+   */
+  sampleData: sampleAsked || (__DEV__ && apiUrl === PLACEHOLDER),
 };
 `,
 
@@ -666,6 +712,7 @@ import { Screen } from "@/components/ui/screen";
 import { TextField } from "@/components/ui/text-field";
 import { useSession } from "@/features/auth/session";
 import { ApiError, request } from "@/lib/api";
+import { env } from "@/lib/env";
 import { space } from "@/theme/tokens";
 
 const SignedIn = z.object({ token: z.string().min(1) });
@@ -676,7 +723,9 @@ export function SignInScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const login = useMutation({
-    mutationFn: () => request("/auth/sign-in", { method: "POST", body: { email: email.trim(), password }, schema: SignedIn }),
+    // With no server yet (env.sampleData) any email and password sign in; the request is the real one.
+    mutationFn: async () =>
+      env.sampleData ? { token: "sample" } : request("/auth/sign-in", { method: "POST", body: { email: email.trim(), password }, schema: SignedIn }),
     onSuccess: ({ token }) => signIn(token),
   });
   const ready = /^\\S+@\\S+\\.\\S+$/.test(email.trim()) && password.length > 0;
@@ -747,7 +796,9 @@ const styles = StyleSheet.create({
     const dir = `src/features/${f.name}`;
     files[`${dir}/api.ts`] = `import { z } from "zod";
 
+import { ${name}Sample } from "@/features/${f.name}/sample";
 import { request } from "@/lib/api";
+import { env } from "@/lib/env";
 
 // ${f.purpose}
 // Describe what the server returns; everything else in this feature gets its types from here.
@@ -764,13 +815,34 @@ export const ${name}ItemSchema = z.object({
 });
 export type ${Name}Item = z.output<typeof ${name}ItemSchema>;
 
-export function fetch${Name}(signal?: AbortSignal) {
+// Until the server exists, development builds answer from sample.ts (see env.sampleData).
+// The request() calls below are the real ones: point them at the real endpoints, never remove them.
+export async function fetch${Name}(signal?: AbortSignal): Promise<${Name}Item[]> {
+  if (env.sampleData) return ${name}Sample;
   return request("/${f.name}", { schema: z.array(${name}ItemSchema), signal });
 }
 
-export function fetch${Name}Item(id: string, signal?: AbortSignal) {
+export async function fetch${Name}Item(id: string, signal?: AbortSignal): Promise<${Name}Item> {
+  if (env.sampleData) {
+    const item = ${name}Sample.find((x) => x.id === id);
+    if (!item) throw new Error("Not found");
+    return item;
+  }
   return request("/${f.name}/" + encodeURIComponent(id), { schema: ${name}ItemSchema, signal });
 }
+`;
+    const samples = f.samples?.length ? f.samples : [1, 2, 3].map((n) => ({ title: `${titleOf(f.name)} ${n}`, subtitle: "Sample item", status: undefined }));
+    files[`${dir}/sample.ts`] = `import type { ${Name}Item } from "@/features/${f.name}/api";
+
+/**
+ * Shown in development until EXPO_PUBLIC_API_URL points at a real server.
+ * Change it freely; api.ts keeps the real calls.
+ */
+export const ${name}Sample: ${Name}Item[] = [
+${samples
+  .map((x, i) => `  { id: "${i + 1}", title: ${JSON.stringify(x.title)}${x.subtitle ? `, subtitle: ${JSON.stringify(x.subtitle)}` : ""}${x.status ? `, status: ${JSON.stringify(x.status)}` : ""} },`)
+  .join("\n")}
+];
 `;
     files[`${dir}/use-${f.name}.ts`] = `import { useQuery } from "@tanstack/react-query";
 
@@ -800,6 +872,7 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { Empty, Failed, Loading } from "@/components/ui/states";
 import type { ${Name}Item } from "@/features/${f.name}/api";
 import { use${Name} } from "@/features/${f.name}/use-${f.name}";
+import { env } from "@/lib/env";
 import { space } from "@/theme/tokens";
 
 function Row({ item }: { item: ${Name}Item }) {
@@ -839,7 +912,7 @@ export function ${Name}Screen() {
         ItemSeparatorComponent={Gap}
         ListHeaderComponent={
           <View style={styles.head}>
-            <SectionHeader title="${titleOf(f.name)}" detail={query.data.length ? String(query.data.length) : undefined} />
+            <SectionHeader title="${titleOf(f.name)}" detail={env.sampleData ? "Sample data" : query.data.length ? String(query.data.length) : undefined} />
             {query.data.length > 4 ? <SearchField value={search} onChangeText={setSearch} placeholder="Search ${titleOf(f.name).toLowerCase()}" /> : null}
           </View>
         }
@@ -921,13 +994,17 @@ ${input.name} is an Expo app. Routes are files in the router's \`app\` folder; e
 
 ## Where things go
 - **Route files** stay thin: they render one screen component from a feature and nothing else.
-- **\`src/features/<name>/\`** holds one area of the app: \`api.ts\` (what the server returns, as a zod schema, and the calls), \`use-<name>.ts\` (TanStack Query hooks and query keys), \`<name>-screen.tsx\` (the list, with search) and \`<name>-detail-screen.tsx\` (one item, opened by tapping a row).
+- **\`src/features/<name>/\`** holds one area of the app: \`api.ts\` (what the server returns, as a zod schema, and the calls), \`sample.ts\` (what development builds show until the server exists), \`use-<name>.ts\` (TanStack Query hooks and query keys), \`<name>-screen.tsx\` (the list, with search) and \`<name>-detail-screen.tsx\` (one item, opened by tapping a row).
 - **\`src/components/ui/\`** has the shared primitives: \`Screen\`, \`AppText\`, \`Button\`, \`TextField\`, \`SearchField\`, \`Card\`, \`ListItem\`, \`Avatar\`, \`Badge\`, \`SectionHeader\`, \`Loading\`, \`Empty\`, \`Failed\`. Build screens from these so safe areas, dark mode, font scaling, touch targets and screen-reader labels come for free.
 - **\`src/theme/tokens.ts\`** is the only place colours, spacing, radii and text sizes are defined.
 - **\`src/lib/\`**: \`api.ts\` is the one place the app talks to the server; \`query.ts\` configures caching; \`env.ts\` reads environment config.
 - **\`src/providers/app-providers.tsx\`** wraps the root layout; new app-wide providers go there.
 
+## Sample data
+Until \`EXPO_PUBLIC_API_URL\` points at a real server, development builds set \`env.sampleData\`: each feature answers from its \`sample.ts\`, any email and password sign in, and list headers say "Sample data". The \`request()\` calls in \`api.ts\` stay where they are; when the server exists, set the address in \`.env\` and they take over. A release build without a real address refuses to start.
+
 ## Rules
+- Made-up data lives only in \`sample.ts\`. \`api.ts\` always keeps its \`request()\` calls.
 - Server data lives in TanStack Query, never copied into a store. Client state is local first; a small zustand store only when several screens need it.
 - Tokens and other secrets go in \`expo-secure-store\`. \`EXPO_PUBLIC_\` variables are public.
 - Every response is validated with its zod schema in \`api.ts\`; no \`any\`.
@@ -1153,14 +1230,14 @@ export function appKitTool(): AgentTool {
           : wired !== undefined
             ? `${layoutPath} now wraps the app in <AppProviders>${input.auth ? ", which restores the session and shows the sign-in screen to signed-out users: add no session code to the layout" : ""}. For each feature, make its route file in ${routes}/ render the feature's screen component and nothing else (e.g. \`export { ${pascal(input.features[0]!.name)}Screen as default } from "@/features/${input.features[0]!.name}/${input.features[0]!.name}-screen"\`).`
             : `In ${layoutPath}, import { AppProviders } from "@/providers/app-providers" and wrap everything the layout returns in <AppProviders>…</AppProviders>${input.auth ? " (it restores the session and shows the sign-in screen itself: add no session code)" : ""}. For each feature, make its route file in ${routes}/ render the feature's screen component and nothing else.`,
-        "Fill in each feature: the real response schema and endpoints in its api.ts, the real rows, details and actions in its screen. With no backend yet, keep the request() call and say so in your answer; use made-up data only when the user asks for a demo.",
-        "Copy .env.example to .env with the real API URL.",
+        "Fill in each feature: the real response schema and endpoints in its api.ts, the real rows, details and actions in its screen.",
+        "There is no server yet, and the app already handles that: in development it shows each feature's sample.ts, signs in with any email and password, and marks lists \"Sample data\". To change what is shown, edit sample.ts. Never replace the request() calls in api.ts with hard-coded data, and say in your answer that the app runs on sample data until EXPO_PUBLIC_API_URL is set in .env.",
         "Check: `npx tsc --noEmit`, `npx expo lint`, `npx expo-doctor`.",
       ].filter(Boolean);
       return {
         ok: true,
         edited: written.length > 0,
-        content: `Added the architecture (${written.length} files): ${written.slice(0, 40).join(", ")}.${kept.length ? `\nLeft alone because they already existed: ${kept.join(", ")}.` : ""}\n${identity}\ndocs/ARCHITECTURE.md describes where things go; follow it.\n\nNext:\n${steps.map((x, i) => `${i + 1}. ${x}`).join("\n")}\n\nBuild screens from the primitives in src/components/ui (Screen, AppText, Button, TextField, SearchField, Card, ListItem, Avatar, Badge, SectionHeader, Loading, Empty, Failed) and the tokens in src/theme/tokens.ts; don't restyle from scratch.`,
+        content: `Added the architecture (${written.length} files): ${written.slice(0, 40).join(", ")}.${kept.length ? `\nLeft alone because they already existed: ${kept.join(", ")}.` : ""}\n${identity}\ndocs/ARCHITECTURE.md describes where things go; follow it.\n\nNext:\n${steps.map((x, i) => `${i + 1}. ${x}`).join("\n")}\n\n${PARTS}`,
       };
     },
   } as AgentTool;

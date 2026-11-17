@@ -20,6 +20,9 @@ What this model gets wrong when it drives the agent, and what the code does abou
 | Writes stale library APIs from memory | Docs packs matched to the project's versions; the plan starts with a lookup when a library is named; the project's AGENTS.md is read | `memory-service/docs`, `prompt.ts`, playbooks |
 | Hand-writes project scaffolding with old versions | New Expo apps are created with `create-expo-app`, then `app_kit` adds the architecture; packages go through `expo install` | `app-kit.ts`, playbooks |
 | Stops to ask for a detail ("what bundle identifier?") while a kit is the forced step, which ended the run | The kit takes a placeholder for anything optional and reports it; a text reply at that point is sent back once with "call the tool now" | `app-kit.ts` (`placeholderBundleId`), `loop.ts` |
+| Replaces the server calls with hard-coded data so an app "works" without a backend | The app kit ships sample data as its own part (`sample.ts`, shown in development until a real API address is set, marked "Sample data"); before finishing, the loop checks that each feature's `api.ts` still calls `request()` and sends the work back once if not | `app-kit.ts` (`kitFindings`), `loop.ts` (`sentBackByKit`) |
+| Ends a run on an error line nothing returned (`API Error: 403 {"error":…}` after a failed edit) | A reply that is only an error line is not accepted as the answer; sent back once | `loop.ts` (`isErrorText`) |
+| Reads every file of a kit it was just given, one by one | The kit's result lists the parts with their props | `app-kit.ts` (`PARTS`) |
 | Saves its answer to a file when asked a question and told not to change anything | File-writing tools are not offered for such requests | `loop.ts` (`isReadOnlyRequest`) |
 
 ## When adding a safeguard

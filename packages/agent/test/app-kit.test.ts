@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type ChatModel, iconFor, kitFiles, kitPackages, pickPlaybooks, placeholderBundleId, renderPlaybooks, runAgentTask, TOOLS, wireProviders, Workspace } from "../src/index.js";
+import { type ChatModel, iconFor, isErrorText, kitFiles, kitFindings, kitPackages, pickPlaybooks, placeholderBundleId, renderPlaybooks, runAgentTask, TOOLS, wireProviders, Workspace } from "../src/index.js";
 import type { ToolContext } from "../src/tools.js";
 
 let dir: string;
@@ -209,5 +209,68 @@ describe("app kit", () => {
     expect(placeholderBundleId("Brico")).toBe("com.example.brico");
     expect(placeholderBundleId("Šišanje & Co.")).toBe("com.example.sisanjeco");
     expect(placeholderBundleId("2Go")).toBe("com.example.app2go");
+  });
+  it("shows sample data until there is a server, and keeps the real calls beside it", () => {
+    const files = kitFiles({ ...INPUT, features: [{ name: "bookings", purpose: "Upcoming and past appointments.", samples: [{ title: "Classic cut", subtitle: "Sat 5 Dec, 11:00 · Amar", status: "Confirmed" }, { title: "Beard trim" }] }] });
+    const api = files["src/features/bookings/api.ts"]!;
+    expect(api).toContain("if (env.sampleData) return bookingsSample;");
+    expect(api).toContain('return request("/bookings", { schema: z.array(bookingsItemSchema), signal });');
+    const sample = files["src/features/bookings/sample.ts"]!;
+    expect(sample).toContain('{ id: "1", title: "Classic cut", subtitle: "Sat 5 Dec, 11:00 · Amar", status: "Confirmed" },');
+    expect(sample).toContain('{ id: "2", title: "Beard trim" },');
+    // Without samples from the model there is still something to show.
+    expect(kitFiles(INPUT)["src/features/bookings/sample.ts"]).toContain('title: "Bookings 1"');
+    const env = files["src/lib/env.ts"]!;
+    expect(env).toContain('sampleData: sampleAsked || (__DEV__ && apiUrl === PLACEHOLDER)');
+    expect(env).toContain('if (!__DEV__) throw new Error("EXPO_PUBLIC_API_URL is not set for this build.");');
+    expect(files["src/features/auth/sign-in-screen.tsx"]).toContain('env.sampleData ? { token: "sample" } : request("/auth/sign-in"');
+    expect(files["src/features/bookings/bookings-screen.tsx"]).toContain('detail={env.sampleData ? "Sample data" :');
+  });
+
+  it("notices a feature that no longer calls the server", () => {
+    const files = kitFiles(INPUT);
+    const read = (over: Record<string, string>) => (path: string) => over[path] ?? files[path];
+    expect(kitFindings(read({}), ["bookings", "open-hours"])).toEqual([]);
+    const mocked = { "src/features/bookings/api.ts": "export async function fetchBookings() { return [{ id: '1', title: 'Fade' }]; }\n" };
+    expect(kitFindings(read(mocked), ["bookings", "open-hours"])).toEqual([expect.stringMatching(/^src\/features\/bookings\/api\.ts no longer calls the server/)]);
+    expect(kitFindings(() => undefined, ["bookings"])).toEqual([]);
+  });
+
+  it("sends the work back when the model swaps the server calls for hard-coded data, and when the answer is an error line", async () => {
+    const runCommand = {
+      ...TOOLS.find((t) => t.name === "run_command")!,
+      async run() {
+        if (!existsSync(join(dir, "app.json"))) expoProject();
+        return { ok: true, exitCode: 0, content: "exit 0" };
+      },
+    };
+    const notes: string[] = [];
+    let turn = 0;
+    const model: ChatModel = {
+      id: "test",
+      async complete(req) {
+        if (req.jsonSchema) return { content: JSON.stringify({ title: "Brico app", brief: { goal: "g", deliverables: [], requirements: [], acceptance: [], outOfScope: [], assumptions: [] }, summary: "An app.", steps: [{ title: "Build it", files: [] }] }), toolCalls: [] };
+        notes.push(String(req.messages.at(-1)!.content));
+        turn++;
+        if (turn === 1) return { content: "", toolCalls: [{ id: "k", name: "app_kit", arguments: JSON.stringify(INPUT) }] };
+        if (turn === 2) return { content: "", toolCalls: [{ id: "w", name: "create_file", arguments: JSON.stringify({ path: "src/features/bookings/api.ts", content: "export async function fetchBookings() {\n  return [{ id: '1', title: 'Fade' }];\n}\n", overwrite: true }) }] };
+        if (turn === 3) return { content: "The app is built.", toolCalls: [] };
+        if (turn === 4) return { content: 'API Error: 403 {"error":{"code":"UNAUTHORIZED","message":"Forbidden access to resource."}}', toolCalls: [] };
+        return { content: "Brico is set up with bookings and opening hours. It runs on sample data until EXPO_PUBLIC_API_URL is set.", toolCalls: [] };
+      },
+    };
+    const outcome = await runAgentTask({ model, workspace: new Workspace(dir), task: "Build a mobile app for booking barbers, called Brico", approve: async () => true, checks: [], review: false, tools: [...TOOLS.filter((t) => t.name !== "run_command"), runCommand as never] });
+    expect(outcome.status).toBe("done");
+    expect(notes[3]).toMatch(/^Before you finish:\n- src\/features\/bookings\/api\.ts no longer calls the server/);
+    expect(notes[4]).toMatch(/^That reads like an error message, and no tool in this run returned it\./);
+    expect(outcome.message).toContain("sample data");
+  });
+
+  it("tells an error line from an answer", () => {
+    expect(isErrorText('API Error: 403 {"error":{"code":"UNAUTHORIZED","message":"Forbidden access to resource."}}')).toBe(true);
+    expect(isErrorText('{"error": {"message": "rate limited"}}')).toBe(true);
+    expect(isErrorText("401 Unauthorized")).toBe(true);
+    expect(isErrorText("The sign-in call returned 403 because the token was missing; I fixed the header and the test passes now.")).toBe(false);
+    expect(isErrorText("Error handling is now in src/lib/api.ts: every failed request becomes an ApiError.")).toBe(false);
   });
 });
