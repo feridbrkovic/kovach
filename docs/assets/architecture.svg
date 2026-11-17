@@ -1,0 +1,37 @@
+<svg viewBox="0 0 760 548" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="13">
+<rect width="760" height="548" fill="#ffffff"/><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8a8f98"/></marker></defs>
+<text x="24" y="34" font-size="15" font-weight="600" fill="#1d1f23">Every write passes the gates; each task reads a small, ranked slice</text>
+<g fill="none" stroke="#8a8f98" stroke-width="1.25">
+<path d="M125 116V148" marker-end="url(#a)"/><path d="M295 116V148" marker-end="url(#a)"/><path d="M465 116V148" marker-end="url(#a)"/><path d="M635 116V148" marker-end="url(#a)"/>
+<path d="M207 188V220" marker-end="url(#a)"/><path d="M366 256H394" marker-end="url(#a)"/><path d="M553 292V332" marker-end="url(#a)"/><path d="M48 168H32V332" marker-end="url(#a)"/>
+<path d="M207 416V452" marker-end="url(#a)"/><path d="M366 488H394" marker-end="url(#a)"/>
+</g>
+<g fill="none" stroke="#8a8f98" stroke-width="1.25">
+<rect x="48" y="60" width="154" height="56" rx="8"/><rect x="218" y="60" width="154" height="56" rx="8"/><rect x="388" y="60" width="154" height="56" rx="8"/><rect x="558" y="60" width="154" height="56" rx="8"/>
+<rect x="48" y="148" width="664" height="40" rx="8"/><rect x="48" y="220" width="318" height="72" rx="8"/>
+<rect x="24" y="332" width="688" height="84" rx="8"/><rect x="48" y="452" width="318" height="72" rx="8"/><rect x="394" y="452" width="318" height="72" rx="8"/>
+</g>
+<rect x="394" y="220" width="318" height="72" rx="8" fill="#2f6fd6" fill-opacity="0.12" stroke="#2f6fd6" stroke-width="2"/>
+<g fill="none" stroke="#8a8f98" stroke-width="1">
+<rect x="40" y="368" width="118" height="32" rx="8"/><rect x="174" y="368" width="118" height="32" rx="8"/><rect x="308" y="368" width="118" height="32" rx="8"/><rect x="442" y="368" width="118" height="32" rx="8"/><rect x="576" y="368" width="118" height="32" rx="8"/>
+</g>
+<g text-anchor="middle" fill="#1d1f23">
+<text x="125" y="84" font-weight="600">Chat messages</text><text x="295" y="84" font-weight="600">Tool runs</text><text x="465" y="84" font-weight="600">Web research</text><text x="635" y="84" font-weight="600">Remember / edit</text>
+<text x="380" y="172">Capture, secret scan, save raw history</text>
+<g font-size="11.5"><text x="99" y="388">History</text><text x="233" y="388">Memories</text><text x="367" y="388">Episodes</text><text x="501" y="388">Docs packs</text><text x="635" y="388">FTS5 + vectors</text></g>
+</g>
+<g text-anchor="middle" font-size="11.5" fill="#62666e">
+<text x="125" y="102">user and agent</text><text x="295" y="102">exit codes, outputs</text><text x="465" y="102">pages, docs packs</text><text x="635" y="102">explicit user input</text>
+</g>
+<g fill="#1d1f23">
+<text x="64" y="244" font-weight="600">Extraction job, after each task</text>
+<text x="64" y="264" font-size="11.5">Detects fail-to-pass fixes, proposes facts</text><text x="64" y="280" font-size="11.5">Strict JSON, max 5, each with evidence</text>
+<text x="410" y="244" font-weight="600">Quality gates</text>
+<text x="410" y="264" font-size="11.5">Evidence, dedup, supersession, conflicts</text><text x="410" y="280" font-size="11.5">Inferred items wait in the review inbox</text>
+<text x="40" y="356" font-weight="600">SQLite, one local file, vectors from embeddinggemma</text>
+<text x="64" y="476" font-weight="600">Retriever and prompt builder</text>
+<text x="64" y="496" font-size="11.5">Pinned, project card, hybrid search</text><text x="64" y="512" font-size="11.5">Max 6 items, 1.6k tokens, cited by id</text>
+<text x="410" y="476" font-weight="600">Qwen via oMLX</text>
+<text x="410" y="496" font-size="11.5">Answers with task and memories</text><text x="410" y="512" font-size="11.5">Its tool runs are captured again</text>
+</g>
+</svg>
