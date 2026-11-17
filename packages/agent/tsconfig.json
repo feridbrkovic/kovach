@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "paths": {
+      "@kovach-dev/memory-contract": ["../memory-contract/src/index.ts"],
+      "@kovach-dev/memory-service": ["../memory-service/src/index.ts"]
+    }
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}
