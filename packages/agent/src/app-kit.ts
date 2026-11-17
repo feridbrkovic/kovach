@@ -7,7 +7,7 @@
  * primitives with accessibility built in, a feature folder pattern and release config.
  * It uses only APIs that have been stable across SDKs; versions come from `npx expo install`.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import type { AgentTool, ToolContext, ToolOutcome } from "./tools.js";
@@ -1169,6 +1169,8 @@ export function appKitTool(): AgentTool {
       };
       for (const [rel, content] of Object.entries(kitFiles(input))) write(rel, content);
       write("eas.json", EAS_JSON);
+      // What \`expo start\` writes on first run; without it \`tsc\` can't resolve the template's CSS imports.
+      write("expo-env.d.ts", '/// <reference types="expo/types" />\n\n// NOTE: This file should not be edited and should be in your git ignore\n');
 
       // Identity for the stores, when the project keeps its config as JSON.
       let identity = "Set the name, ios.bundleIdentifier and android.package in the app config yourself (it isn't plain app.json).";
@@ -1218,6 +1220,10 @@ export function appKitTool(): AgentTool {
         const themeFrom = /import \{[^}]*ThemeProvider[^}]*\} from ['"]([^'"]+)['"]/.exec(layout)?.[1];
         wired = rootLayout(input, themeFrom);
         writeFileSync(ctx.workspace.resolve(layoutPath), wired, "utf8");
+        // The template's own tab bar was only used by the layout just replaced, and its web
+        // variant has a type error that would keep the project's typecheck red.
+        const base = layoutPath.startsWith("src/") ? "src/" : "";
+        for (const rel of [`${base}components/app-tabs.tsx`, `${base}components/app-tabs.web.tsx`]) rmSync(ctx.workspace.resolve(rel), { force: true });
       } else {
         wired = layout === undefined ? undefined : wireProviders(layout);
         if (wired !== undefined && wired !== layout) writeFileSync(ctx.workspace.resolve(layoutPath), wired, "utf8");

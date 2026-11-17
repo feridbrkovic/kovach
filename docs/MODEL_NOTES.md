@@ -23,6 +23,7 @@ What this model gets wrong when it drives the agent, and what the code does abou
 | Replaces the server calls with hard-coded data so an app "works" without a backend | The app kit ships sample data as its own part (`sample.ts`, shown in development until a real API address is set, marked "Sample data"); before finishing, the loop checks that each feature's `api.ts` still calls `request()` and sends the work back once if not | `app-kit.ts` (`kitFindings`), `loop.ts` (`sentBackByKit`) |
 | Ends a run on an error line nothing returned (`API Error: 403 {"error":…}` after a failed edit) | A reply that is only an error line is not accepted as the answer; sent back once | `loop.ts` (`isErrorText`) |
 | Reads every file of a kit it was just given, one by one | The kit's result lists the parts with their props | `app-kit.ts` (`PARTS`) |
+| Spends turns filtering `tsc` output because a new Expo project never typechecks clean (the template's CSS imports and its unused web tab bar) | The app kit writes Expo's `expo-env.d.ts` and removes the tab bar it replaced, so `npx tsc --noEmit` exits 0 and the check means something | `app-kit.ts` |
 | Saves its answer to a file when asked a question and told not to change anything | File-writing tools are not offered for such requests | `loop.ts` (`isReadOnlyRequest`) |
 
 ## When adding a safeguard

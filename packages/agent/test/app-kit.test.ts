@@ -273,4 +273,16 @@ describe("app kit", () => {
     expect(isErrorText("The sign-in call returned 403 because the token was missing; I fixed the header and the test passes now.")).toBe(false);
     expect(isErrorText("Error handling is now in src/lib/api.ts: every failed request becomes an ApiError.")).toBe(false);
   });
+  it("leaves the generated project with a clean typecheck: Expo's type file is there and the unused template tab bar is gone", async () => {
+    expoProject();
+    writeFileSync(join(dir, "src/app/_layout.tsx"), "import AppTabs from '@/components/app-tabs';\nexport default function Layout() { return <AppTabs />; }\n");
+    mkdirSync(join(dir, "src/components"), { recursive: true });
+    writeFileSync(join(dir, "src/components/app-tabs.tsx"), "export default function AppTabs() { return null; }\n");
+    writeFileSync(join(dir, "src/components/app-tabs.web.tsx"), "export default function AppTabs() { return null; }\n");
+    const out = await kit.run(kit.schema.parse(INPUT), ctx());
+    expect(out.ok).toBe(true);
+    expect(readFileSync(join(dir, "expo-env.d.ts"), "utf8")).toContain('/// <reference types="expo/types" />');
+    expect(existsSync(join(dir, "src/components/app-tabs.tsx"))).toBe(false);
+    expect(existsSync(join(dir, "src/components/app-tabs.web.tsx"))).toBe(false);
+  });
 });
