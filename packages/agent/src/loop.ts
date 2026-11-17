@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { z } from "zod";
 import { type Check, detectChecks } from "./checks.js";
 import { ModelError, textOf } from "./model.js";
@@ -106,6 +107,8 @@ export interface AgentOutcome {
   plan?: Plan;
   checks?: CheckRun[];
   edited: boolean;
+  /** Every file this session has made so far, earlier messages included. */
+  made: string[];
 }
 
 export interface AgentOptions {
@@ -127,6 +130,13 @@ export interface AgentOptions {
   maxCheckRounds?: number;
   /** The user's override: allow finishing while checks are red. */
   allowFailingChecks?: boolean;
+  /** Look and report only (a scheduled task's trial run): no tools that change files or run commands. */
+  readOnly?: boolean;
+  /**
+   * Files this session made in earlier messages. The agent may rebuild or replace them as if it had
+   * made them in this message: a follow-up must not treat its own page or app as someone else's.
+   */
+  madeEarlier?: Iterable<string>;
   /** Review the change with fresh context before finishing (MASTER_PLAN › Agent quality, item 6). Default true. */
   review?: boolean;
   /** The model for the review; defaults to `model`. */
@@ -167,7 +177,11 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
   const { model, workspace, history } = options;
   // "Question only, don't change anything": the tools that write files aren't offered at all.
   // Told not to change anything, the model still saves its answer to a file now and then.
-  const tools = isReadOnlyRequest(textOf(options.task)) ? (options.tools ?? TOOLS).filter((t) => !WRITING_TOOLS.has(t.name)) : (options.tools ?? TOOLS);
+  const tools = options.readOnly
+    ? (options.tools ?? TOOLS).filter((t) => !WRITING_TOOLS.has(t.name) && t.name !== "run_command")
+    : isReadOnlyRequest(textOf(options.task))
+      ? (options.tools ?? TOOLS).filter((t) => !WRITING_TOOLS.has(t.name))
+      : (options.tools ?? TOOLS);
   const specs = toolSpecs(tools);
   const byName = new Map(tools.map((t) => [t.name, t]));
   const checks = options.checks ?? detectChecks(workspace.root);
@@ -180,7 +194,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
     approve: options.approve,
     checks,
     limits: { editLines: 150, newFileLines: 400, commandTimeoutMs: 10 * 60_000, ...options.limits },
-    createdThisRun: new Set<string>(),
+    createdThisRun: new Set<string>(options.madeEarlier ?? []),
     ...(options.signal ? { signal: options.signal } : {}),
   };
   const emit = (e: AgentEvent) => options.onEvent?.(e);
@@ -234,7 +248,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
   let looked = false;
 
   const finish = (status: AgentStatus, message: string): AgentOutcome => {
-    const outcome: AgentOutcome = { status, turns, message, edited };
+    const outcome: AgentOutcome = { status, turns, message, edited, made: [...(ctx.createdThisRun ?? [])].sort() };
     if (plan) outcome.plan = plan;
     if (lastChecks) outcome.checks = lastChecks;
     emit({ type: "done", outcome });
@@ -274,17 +288,27 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
         record("assistant", text);
         emit({ type: "plan", plan });
       }
+      const runner = tools.find((t) => t.name === "run_command");
+      /** A command the loop runs itself (the user still approves it), recorded like the model's own. */
+      const step = async (label: string, command: string) => {
+        const args = { command, timeoutSeconds: 900 };
+        emit({ type: "tool_start", name: "run_command", args });
+        const result = await runner!.run(args, ctx);
+        const ids = record("tool", label, [{ name: "run_command", args }]);
+        if (ids?.[0]) history!.recorder.completeToolCall(ids[0], { exitCode: result.exitCode ?? (result.ok ? 0 : 1), output: result.output ?? result.content, ...(result.durationMs !== undefined ? { durationMs: result.durationMs } : {}) });
+        emit({ type: "tool", name: "run_command", args, ok: result.ok, summary: result.content.split("\n")[0]! });
+        return result;
+      };
+      // An existing JavaScript project without its packages (removed to free space, or never
+      // installed): every check would fail on missing modules, so they are installed first.
+      const install = !newApp && runner && !options.readOnly && !isReadOnlyRequest(textOf(options.task)) ? reinstallCommand(workspace.root) : undefined;
+      if (install) {
+        const got = await step("Installing the project's packages", install);
+        const note = got.ok ? `The project's packages were missing, so \`${install}\` was run first. They are installed now.` : `The project's packages are missing and \`${install}\` didn't work:\n${got.content.slice(0, 1200)}\nChecks that need them will fail; say so if it matters for the task.`;
+        messages.push(loopNote(note));
+        record("tool", note);
+      }
       if (newApp) {
-        const create = tools.find((t) => t.name === "run_command")!;
-        const step = async (label: string, command: string) => {
-          const args = { command, timeoutSeconds: 900 };
-          emit({ type: "tool_start", name: "run_command", args });
-          const result = await create.run(args, ctx);
-          const ids = record("tool", label, [{ name: "run_command", args }]);
-          if (ids?.[0]) history!.recorder.completeToolCall(ids[0], { exitCode: result.exitCode ?? (result.ok ? 0 : 1), output: result.output ?? result.content, ...(result.durationMs !== undefined ? { durationMs: result.durationMs } : {}) });
-          emit({ type: "tool", name: "run_command", args, ok: result.ok, summary: result.content.split("\n")[0]! });
-          return result;
-        };
         let outcome = await step("Creating the Expo project", "npx --yes create-expo-app@latest . --template default");
         // Without a terminal the generator can skip installing; nothing else works until the packages are there.
         if (outcome.ok && !existsSync(workspace.resolve("node_modules/expo/package.json"))) outcome = await step("Installing the project's packages", "npm install --no-audit --no-fund");
@@ -292,7 +316,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
         const note = outcome.ok
           ? "The Expo project now exists: it was created with `npx create-expo-app@latest` (current SDK, versions and layout; its AGENTS.md says what changed in this SDK). Don't write package.json or the template files yourself. Call app_kit now with the app's name, whether users sign in, and its main features (kebab-case names); add the bundle identifier only if the user gave one. Don't stop to ask questions first."
           : `Creating the Expo project failed:\n${outcome.content.slice(0, 1500)}\n\nDon't write the project by hand. Tell the user what is needed (network access and approval to run \`npx create-expo-app@latest\`) and stop.`;
-        messages.push({ role: "user", content: note });
+        messages.push(loopNote(note));
         record("tool", note);
       }
     }
@@ -307,7 +331,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
       if (kitOnly) kitTurns++;
       if (kitOnly && kitTurns === 1 && forced === "design_kit") {
         const note = "Build the page now with design_kit: decide the content (a name if none was given, the search phrase, headline, the offer, the story, how it works, questions and answers, contact details) and call it. Everything the user asked for must be in it. Don't write HTML or CSS yourself.";
-        messages.push({ role: "user", content: note });
+        messages.push(loopNote(note));
         record("tool", note);
       }
       trimOldOutput(messages);
@@ -326,7 +350,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
         modelRetries++;
         if (kitOnly) kitTurns--;
         const note = "Your last reply couldn't be read: its tool call was malformed. Send the call again, with every string value quoted and its quotes and line breaks escaped.";
-        messages.push({ role: "user", content: note });
+        messages.push(loopNote(note));
         record("tool", note);
         continue;
       }
@@ -335,7 +359,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
       if (res.toolCalls.length === 0 && isRepetitive(res.content) && degenerateRetries < 2) {
         degenerateRetries++;
         const note = "Your last reply repeated itself and was thrown away. Answer again, briefly, without repeating lines.";
-        messages.push({ role: "user", content: note });
+        messages.push(loopNote(note));
         record("tool", note);
         continue;
       }
@@ -369,7 +393,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
           : isPlanEcho(res.content) && plan
             ? "That restates the plan. Don't write it again: carry out its first step now with the tools, then give your answer."
             : "You said what you'd do next but stopped. Do it now with the tools, then give your answer.";
-        messages.push({ role: "user", content: nudge });
+        messages.push(loopNote(nudge));
         record("tool", nudge);
         continue;
       }
@@ -397,7 +421,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
         }
         const seen = await recallFor(runs.filter((r) => !r.declined && r.exitCode !== 0).map((r) => r.output).join("\n"));
         const nudge = `You can't finish yet: the project's checks fail.\n\n${describeChecks(runs)}${seen}\n\nFix the cause (not the checks), then run_checks again.`;
-        messages.push({ role: "user", content: nudge });
+        messages.push(loopNote(nudge));
         // A note from the loop, not from the user: kept out of what memory treats as the user's words.
         record("tool", nudge);
         continue;
@@ -480,7 +504,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
           const note = installed.ok
             ? `The packages are installed (\`${install}\` ran). Skip that step. Add packages only with \`npx expo install <package>\`, never npm, yarn or pnpm add.`
             : `Installing the packages failed:\n${installed.content.slice(0, 1200)}\n\nFix the cause and run \`${install}\` again; don't use npm, yarn or pnpm add.`;
-          messages.push({ role: "user", content: note });
+          messages.push(loopNote(note));
           record("tool", note);
         }
         emit({
@@ -498,7 +522,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
       }
       if (sameCalls === 2) {
         const note = "That is the third time in a row you made exactly the same call, and its result hasn't changed. Don't repeat it: use what you already have, try a different approach, or give your answer and say what is blocking you.";
-        messages.push({ role: "user", content: note });
+        messages.push(loopNote(note));
         record("tool", note);
       }
     }
@@ -507,7 +531,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
     const stopped = `Stopped after ${maxTurns} steps without finishing. Reply "continue" to go on from here.`;
     if (options.signal?.aborted) return finish("max_turns", stopped);
     const wrap = "You are out of steps for this run. Without tools, say in a few lines where things stand: what is finished, what is half-done (name the file), and what is left to do.";
-    messages.push({ role: "user", content: wrap });
+    messages.push(loopNote(wrap));
     record("tool", wrap);
     let summary = "";
     try {
@@ -538,7 +562,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
     const nudge = errorText
       ? "That reads like an error message, and no tool in this run returned it. If your last step failed, read the file again and redo it. Then give your final answer: what you built or changed, what didn't work and at which step, how to open or run it, and what is left for the user."
       : "Give your final answer now, without tools: what you built or changed, the files, how to open or run it, and anything left in [square brackets] for the user to fill in.";
-    messages.push({ role: "user", content: nudge });
+    messages.push(loopNote(nudge));
     record("tool", nudge);
     return true;
   }
@@ -561,7 +585,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
     const findings = kitFindings(read, kitFeatures);
     if (findings.length === 0) return false;
     const note = `Before you finish:\n${findings.map((f) => `- ${f}`).join("\n")}\nFix this, run the checks again, then give your answer.`;
-    messages.push({ role: "user", content: note });
+    messages.push(loopNote(note));
     record("tool", note);
     return true;
   }
@@ -651,7 +675,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
     emit({ type: "tool", name: "self_review", args: { files }, ok: must.length === 0, summary: summary.split("\n")[0]! });
     if (!must.length) return false;
     const nudge = reviewNudge(issues!);
-    messages.push({ role: "user", content: nudge });
+    messages.push(loopNote(nudge));
     return true;
   }
 
@@ -759,6 +783,26 @@ export function isErrorText(content: string): boolean {
   const text = content.trim();
   if (!text || text.length > 400) return false;
   return /^(api\s+)?error\b\s*:?\s*\d{3}\b/i.test(text) || /^\{\s*"error"\s*:/.test(text) || /^(http\s+)?[45]\d{2}\s+(unauthorized|forbidden|not found|bad request|internal server error)\b/i.test(text);
+}
+
+/**
+ * The loop's own notes travel as user messages (the chat format has no other place for them).
+ * Marked, so the model acts on them instead of answering the user ("You're absolutely right…").
+ */
+/** The install command for a JavaScript project whose packages are missing, by its lockfile. */
+export function reinstallCommand(root: string): string | undefined {
+  const has = (f: string) => existsSync(join(root, f));
+  if (!has("package.json") || has("node_modules")) return undefined;
+  if (has("pnpm-lock.yaml")) return "pnpm install";
+  if (has("yarn.lock")) return "yarn install";
+  if (has("bun.lockb") || has("bun.lock")) return "bun install";
+  if (has("package-lock.json")) return "npm install --no-audit --no-fund";
+  return undefined; // no lockfile: a project that was never installed is the user's call
+}
+
+export const LOOP_NOTE_MARK = "(Automatic note from Local Kovach's checks, not from the user: act on it, don't reply to it or apologise.)";
+export function loopNote(text: string): ChatMessage {
+  return { role: "user", content: `${text}\n\n${LOOP_NOTE_MARK}` };
 }
 
 const EMPTY_ANSWER = /^(all )?(done|finished|complete|completed|ok|okay|ready)[.!]*$/i;

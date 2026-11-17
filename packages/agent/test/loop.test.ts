@@ -22,6 +22,7 @@ import {
   type SessionRecorder,
   SYSTEM_PROMPT,
   Workspace,
+  LOOP_NOTE_MARK,
 } from "../src/index.js";
 
 // A tiny project: "typecheck" fails while src/cart.js still returns a string.
@@ -211,7 +212,7 @@ describe("agent loop", () => {
 
     const empty = scripted([say(""), say("Nothing to change here.")]);
     expect(await run(empty).promise).toMatchObject({ status: "done", message: "Nothing to change here." });
-    expect(empty.requests[1]!.messages.at(-1)).toMatchObject({ role: "user", content: "Your reply was empty. Use the tools to do the task, then give your answer." });
+    expect(empty.requests[1]!.messages.at(-1)).toMatchObject({ role: "user", content: `Your reply was empty. Use the tools to do the task, then give your answer.\n\n${LOOP_NOTE_MARK}` });
 
     // Only once: a second echo ends the run rather than looping.
     const stubborn = scripted([planJson(["A"]), say("Plan: A\n1. A"), say("Plan: A\n1. A")]);
@@ -226,13 +227,13 @@ describe("agent loop", () => {
     ]);
     const outcome = await run(model).promise;
     expect(outcome).toMatchObject({ status: "done", message: "Store it as integer cents, like the other prices." });
-    expect(model.requests[1]!.messages.at(-1)).toMatchObject({ role: "user", content: "You said what you'd do next but stopped. Do it now with the tools, then give your answer." });
+    expect(model.requests[1]!.messages.at(-1)).toMatchObject({ role: "user", content: `You said what you'd do next but stopped. Do it now with the tools, then give your answer.\n\n${LOOP_NOTE_MARK}` });
   });
 
   it("asks once for a real answer when the reply is only a tool's name; short real answers stand", async () => {
     const model = scripted([say("Search"), call("search", { pattern: "toFixed" }), say("Integer cents.")]);
     expect(await run(model).promise).toMatchObject({ status: "done", message: "Integer cents." });
-    expect(model.requests[1]!.messages.at(-1)).toMatchObject({ role: "user", content: "That isn't an answer yet. Use the tools if you need them, then answer in full." });
+    expect(model.requests[1]!.messages.at(-1)).toMatchObject({ role: "user", content: `That isn't an answer yet. Use the tools if you need them, then answer in full.\n\n${LOOP_NOTE_MARK}` });
     expect(model.requests).toHaveLength(3);
 
     const chat = scripted([say("You're welcome!")]);
@@ -646,7 +647,7 @@ describe("self-review before finishing", () => {
     const told = model.requests[4]!.messages.at(-1)!;
     expect(told).toMatchObject({ role: "user" });
     expect(String(told.content)).toBe(
-      "A review of your change (by a reviewer who saw only the task, the diff and the checks) found:\n1. src/cart.js:3: Empty carts return NaN. Fix: Default items to [].\n\nFix each one, or, if a finding is wrong, say why in one sentence. Then finish with your summary.",
+      "A review of your change (by a reviewer who saw only the task, the diff and the checks) found:\n1. src/cart.js:3: Empty carts return NaN. Fix: Default items to [].\n\nFix each one, or, if a finding is wrong, say why in one sentence. Then finish with your summary." + `\n\n${LOOP_NOTE_MARK}`,
     );
     expect(events.find((e) => e.type === "review")).toEqual({ type: "review", issues: [expect.objectContaining({ severity: "must_fix" })] });
 

@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { z } from "zod";
 import type { Check } from "./checks.js";
 import { CODE_TOOLS } from "./code-intel/tools.js";
@@ -115,6 +115,19 @@ export function describeChecks(runs: CheckRun[]): string {
 }
 
 export const allChecksPassed = (runs: CheckRun[]) => runs.every((r) => !r.declined && r.exitCode === 0);
+
+/** Commands that start a new project from a template. */
+const SCAFFOLD = /\b(create-expo-app|create-next-app|create-react-app|create-vite|create-remix|create-astro|create-t3-app|(?:npm|pnpm|yarn|bun)\s+(?:create|init)\b|npx\s+(?:--yes\s+)?(?:degit|tiged)|expo\s+init|react-native\s+init|@react-native-community\/cli\s+init|laravel\s+new|composer\s+create-project|rails\s+new|django-admin\s+startproject|flutter\s+create|cargo\s+(?:new|init))\b/;
+const PROJECT_FILES = ["package.json", "composer.json", "pubspec.yaml", "Cargo.toml", "Gemfile", "manage.py", "app.json"];
+
+/**
+ * The project file that shows this folder already holds a project, when the command would start a
+ * new one. Seen live: on a follow-up message the model ran create-expo-app again.
+ */
+export function scaffoldsOverProject(command: string, root: string): string | undefined {
+  if (!SCAFFOLD.test(command)) return undefined;
+  return PROJECT_FILES.find((f) => existsSync(join(root, f)));
+}
 
 export const TOOLS: AgentTool[] = [
   tool({
@@ -293,6 +306,14 @@ export const TOOLS: AgentTool[] = [
       timeoutSeconds: z.number().int().positive().max(1800).optional(),
     }),
     async run({ command, timeoutSeconds }, ctx) {
+      const existing = scaffoldsOverProject(command, ctx.workspace.root);
+      if (existing) {
+        return {
+          ok: false,
+          command,
+          content: `Not run: this folder already holds a project (${existing}). Don't create it again: change the existing files. If the user really wants a second, separate project, ask them first.`,
+        };
+      }
       if (!(await ctx.approve({ kind: "command", command, cwd: ctx.workspace.root }))) {
         return { ok: false, command, content: `The user declined to run \`${command}\`. Find another way or ask them.` };
       }

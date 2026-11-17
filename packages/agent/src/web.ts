@@ -152,8 +152,14 @@ export async function webFetch(target: string, cfg: WebConfig = {}, signal?: Abo
   return { title, text: htmlToText(html) };
 }
 
+/** Searches one task may make. Seen live: a run spent its steps searching the same thing in new words. */
+export const MAX_SEARCHES = 6;
+const words = (q: string) => [...new Set(q.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])].sort().join(" ");
+
 export function webTools(cfg: WebConfig = {}): AgentTool[] {
   const maxChars = cfg.maxPageChars ?? 12000;
+  // Per task: each run has its own tool context.
+  const searched = new WeakMap<ToolContext, string[]>();
   const clamp = (s: string) => (s.length > maxChars ? `${s.slice(0, maxChars)}\n… [truncated]` : s);
   const search: AgentTool = {
     name: "web_search",
@@ -162,6 +168,14 @@ export function webTools(cfg: WebConfig = {}): AgentTool[] {
     schema: z.object({ query: z.string().min(1), limit: z.number().int().min(1).max(10).optional() }),
     async run(args, ctx: ToolContext): Promise<ToolOutcome> {
       const a = args as { query: string; limit?: number };
+      const done = searched.get(ctx) ?? [];
+      if (done.includes(words(a.query))) {
+        return { ok: false, content: "You already ran this search (same words) in this task. Use those results, fetch_page one of them, or get on with the work." };
+      }
+      if (done.length >= MAX_SEARCHES) {
+        return { ok: false, content: `That's ${MAX_SEARCHES} searches in this task, the limit. Use what you found (fetch_page a result if you need more detail) and do the work now; say in your answer if something is still unknown.` };
+      }
+      searched.set(ctx, [...done, words(a.query)]);
       const results = await webSearch(a.query, { ...cfg, ...(a.limit ? { maxResults: a.limit } : {}) }, ctx.signal);
       if (results.length === 0) return { ok: true, content: `No results for "${a.query}".` };
       return { ok: true, content: results.map((r, i) => `${i + 1}. ${isOfficialSource(r.url) ? "[official] " : ""}${r.title}\n   ${r.url}${r.snippet ? `\n   ${r.snippet}` : ""}`).join("\n\n") };

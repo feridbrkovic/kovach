@@ -11,6 +11,9 @@ export {
   type PageLook,
   progressEvent,
   isErrorText,
+  loopNote,
+  LOOP_NOTE_MARK,
+  reinstallCommand,
   isPlanEcho,
   isToolName,
   renderPlan,
@@ -50,6 +53,7 @@ export {
   webFetch,
   webSearch,
   type WebSearchResult,
+  MAX_SEARCHES,
   webTools,
 } from "./web.js";
 export { type MemoryBackend, memoryTools, type RememberKind } from "./memory-tools.js";
@@ -63,6 +67,7 @@ export {
   type CheckRun,
   describeChecks,
   runChecks,
+  scaffoldsOverProject,
   TOOLS,
   type ToolContext,
   type ToolOutcome,
