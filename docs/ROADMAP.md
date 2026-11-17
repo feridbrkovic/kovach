@@ -122,6 +122,7 @@ Built and tested ahead of their phases so the app is useful now:
   - [ ] Backend: REST and GraphQL APIs (Node, Laravel), database migrations, auth, background jobs, observability, twelve-factor config
   - [ ] Payments: Stripe, plus the gateways used locally; webhooks, idempotency, test mode only until the user goes live
   - [ ] Business and project flows: requirements to tickets, estimates, release checklists, handover notes
+  - [ ] Design from reference links: give one or more URLs; each is opened in the headless browser and measured (colours by area, fonts and type scale, spacing, corner radii, section order, layout of the hero and navigation), the measurements become a custom direction for the page builder or the app kit, and the result is checked against the reference's screenshots. It takes the design language, never the reference's text, images or logo
   - [ ] UI/UX: design tokens to components, motion guidelines, 3D (three.js on the web, Reanimated and Skia in apps)
 - [ ] **Faster and smarter on the same Mac**:
   - [ ] Keep the prompt cache warm: stable prompt prefix, tool list fixed per run, trimmed history appended not rewritten; measure tokens per turn in the eval report
