@@ -1,0 +1,14 @@
+title = "Local Kovach"
+
+[extend]
+useDefault = true
+
+# The secret scanner and the extraction gates are tested with made-up tokens
+# (AKIAABCDEFGHIJKLMNOP, ghp_aaaa…). They live only in tests and recorded fixtures.
+[allowlist]
+description = "Synthetic tokens in tests and fixtures"
+paths = [
+  '''(^|/)test/.*''',
+  '''^evals/fixtures/.*''',
+  '''^packages/agent-fixtures/.*''',
+]
