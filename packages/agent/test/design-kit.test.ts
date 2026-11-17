@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { DESIGN_DIRECTIONS, designKitTool, isAnnouncement, KIT_JS, logoSvg, PAGE_SCRIPT_MARKER, photoTools, runAgentTask, searchPhotos, kitCss, kitMarkup, PAGE_RULES_MARKER, pickDirection, pickPlaybooks, planPrompt, renderPlaybooks, TOOLS, Workspace } from "../src/index.js";
+import { DESIGN_DIRECTIONS, designKitTool, directionFromReference, isAnnouncement, KIT_JS, logoSvg, PAGE_SCRIPT_MARKER, photoTools, runAgentTask, searchPhotos, kitCss, kitMarkup, PAGE_RULES_MARKER, pickDirection, pickPlaybooks, planPrompt, renderPlaybooks, TOOLS, Workspace } from "../src/index.js";
 import { type ChatMessage, type ChatModel, cleanContent, ModelError, recommendedSampling } from "../src/model.js";
 import { isReadOnlyRequest, isRepetitive, trimOldOutput } from "../src/loop.js";
 import type { ToolContext } from "../src/tools.js";
@@ -301,5 +301,34 @@ describe("planning and replies", () => {
     await runAgentTask({ model, workspace: new Workspace(dir), task: "Question only, don't change anything: compare FlatList and FlashList.", approve: async () => true, checks: [], plan: false });
     expect(offered).toContain("read_file");
     for (const name of ["create_file", "edit_file", "insert_lines", "design_kit", "app_kit"]) expect(offered).not.toContain(name);
+  });
+});
+
+describe("design from a reference link", () => {
+  it("builds a direction from what was measured on the reference, on the closest built-in layout", () => {
+    const d = directionFromReference({ url: "https://www.example-studio.com/work", background: "#0b0b0f", text: "#f5f5f7", accent: "#7c5cff", fontDisplay: "Inter", fontBody: "Inter", radius: 14 })!;
+    expect(d.name).toBe("In the style of example-studio.com");
+    expect(d.tokens).toMatchObject({ "--paper": "#0b0b0f", "--ink": "#f5f5f7", "--accent": "#7c5cff", "--accent-ink": "#ffffff", "--radius": "14px" });
+    expect(d.tokens["--font-display"]).toMatch(/^"Inter", /);
+    expect(kitCss(d)).toContain("--accent: #7c5cff");
+    // A light page with a serif headline sits on the editorial layout; unusable colours give nothing.
+    expect(directionFromReference({ url: "https://bakery.example", background: "#fffaf0", text: "#2a1a10", accent: "#f2c14e", fontDisplay: "Playfair Display" })!.tokens["--accent-ink"]).toBe("#111111");
+    expect(directionFromReference({ url: "https://x.example", background: "transparent", text: "#000000", accent: "#ff0000" })).toBeUndefined();
+  });
+
+  it("the page builder measures the user's link and says so; without web access it says that instead", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "kovach-ref-"));
+    const ctx = { workspace: new Workspace(dir), approve: async () => true, checks: [], limits: { editLines: 150, newFileLines: 400, commandTimeoutMs: 1000 }, createdThisRun: new Set<string>() } as never;
+    const asked: string[] = [];
+    const tool = designKitTool({ reference: async (url) => (asked.push(url), { url, background: "#101014", text: "#f2f2f2", accent: "#00c2a8", radius: 8 }) });
+    const out = await tool.run(tool.schema.parse({ ...CONTENT, references: ["https://linear.app/"] }), ctx);
+    expect(out.ok).toBe(true);
+    expect(asked).toEqual(["https://linear.app/"]);
+    expect(out.content).toContain('in the "In the style of linear.app" direction. Its colours, corners and fonts were measured on https://linear.app/');
+    expect(readFileSync(join(dir, "styles.css"), "utf8")).toContain("--accent: #00c2a8");
+    const offline = designKitTool();
+    const dir2 = mkdtempSync(join(tmpdir(), "kovach-ref-"));
+    const out2 = await offline.run(offline.schema.parse({ ...CONTENT, references: ["https://linear.app/"] }), { ...(ctx as object), workspace: new Workspace(dir2), createdThisRun: new Set<string>() } as never);
+    expect(out2.content).toContain("The reference links were not opened: web access is off for this run.");
   });
 });

@@ -75,7 +75,8 @@ export { createTsProject, loadTypescript, type TsProject } from "./code-intel/ty
 export { unifiedDiff } from "./diff.js";
 export { formatIssue, numberDiff, parseReview, REVIEW_SCHEMA, REVIEW_SYSTEM, type ReviewIssue, reviewChange, reviewMessages, reviewNudge } from "./review.js";
 export { pickPlaybooks, PLAYBOOKS, type Playbook, renderPlaybooks } from "./playbooks.js";
-export { DESIGN_DIRECTIONS, KIT_JS, PAGE_RULES_MARKER, PAGE_SCRIPT_MARKER, logoSvg, kitCss, kitMarkup, pickDirection, type DesignDirection } from "./design-kit.js";
+export { DESIGN_DIRECTIONS, KIT_JS, PAGE_RULES_MARKER, PAGE_SCRIPT_MARKER, logoSvg, kitCss, kitMarkup, pickDirection, directionFromReference, type DesignDirection } from "./design-kit.js";
+export type { ReferenceLook } from "./design-kit.js";
 export { photoTools, searchPhotos, type FoundPhoto, type PhotoConfig } from "./photos.js";
 export { designKitTool, PageContent, placeholders, renderPage, type PageBuilderConfig, type PagePhotos } from "./page-builder.js";
 export { APP_LOOKS, AppKitInput, appKitTool, EAS_JSON, iconFor, kitFiles, kitFindings, kitPackages, lookFor, placeholderBundleId, wireProviders } from "./app-kit.js";

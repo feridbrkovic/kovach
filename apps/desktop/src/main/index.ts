@@ -16,7 +16,7 @@ import {
   openDatabase,
 } from "@kovach-dev/memory-service";
 import { createMacDriver, hasCliclick, webFetch } from "@kovach-dev/agent";
-import { lookAtPage } from "./page-look";
+import { lookAtPage, measureReference } from "./page-look";
 import { app, BrowserWindow, desktopCapturer, dialog, ipcMain, Menu, nativeImage, type MenuItemConstructorOptions, safeStorage, shell, systemPreferences } from "electron";
 import { CHANNELS } from "../shared/ipc";
 import { serveAgent } from "./agent-ipc";
@@ -223,6 +223,7 @@ function openMemory(): void {
     ...(macComputer() ? { computer: macComputer()! } : {}),
     ...(macMedia(dataDir) ? { media: macMedia(dataDir)! } : {}),
     lookAtPage,
+    measureReference,
     // Stock photos arrive at camera size; pages need them at screen size.
     resizeImage: async (image, maxWidth) => {
       const picture = nativeImage.createFromBuffer(image);

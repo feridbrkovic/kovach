@@ -3,6 +3,8 @@
  * returns screenshots plus what can be measured (see page-findings.ts). The page runs
  * sandboxed, without Node or the app's preload, in its own throwaway session.
  */
+import type { ReferenceLook } from "@kovach-dev/agent";
+import { isPublicPage, REFERENCE_SCRIPT } from "./reference-look";
 import type { PageLook } from "@kovach-dev/agent";
 import { BrowserWindow } from "electron";
 import { MEASURE_SCRIPT, pageFindings, type PageMeasure } from "./page-findings";
@@ -65,3 +67,34 @@ export async function lookAtPage(path: string, signal?: AbortSignal): Promise<Pa
   }
   return shots.length ? { shots, findings } : undefined;
 }
+
+/** Opens a public page off-screen and measures its look, for "make it look like this link". */
+export async function measureReference(url: string, signal?: AbortSignal): Promise<ReferenceLook | undefined> {
+  if (!isPublicPage(url) || signal?.aborted) return undefined;
+  const win = new BrowserWindow({
+    show: false,
+    width: 1280,
+    height: 900,
+    useContentSize: true,
+    webPreferences: { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false, partition: "page-reference", backgroundThrottling: false },
+  });
+  try {
+    const contents = win.webContents;
+    contents.setAudioMuted(true);
+    contents.setWindowOpenHandler(() => ({ action: "deny" }));
+    contents.session.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+    // A redirect to somewhere that is not a public page ends the visit.
+    contents.on("will-redirect", (event, target) => {
+      if (!isPublicPage(target)) event.preventDefault();
+    });
+    await within(win.loadURL(url), 20_000, "Loading the reference");
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const look = (await within(contents.executeJavaScript(REFERENCE_SCRIPT, true), 10_000, "Measuring the reference")) as Omit<ReferenceLook, "url">;
+    return { ...look, url };
+  } catch {
+    return undefined; // a reference that can't be opened is not a reason to fail the page
+  } finally {
+    if (!win.isDestroyed()) win.destroy();
+  }
+}
+

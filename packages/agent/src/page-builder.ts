@@ -9,7 +9,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { z } from "zod";
-import { DESIGN_DIRECTIONS, type DesignDirection, KIT_JS, kitCss, logoSvg, pickDirection } from "./design-kit.js";
+import { DESIGN_DIRECTIONS, type DesignDirection, directionFromReference, KIT_JS, kitCss, logoSvg, pickDirection, type ReferenceLook } from "./design-kit.js";
 import { type PhotoConfig, type SavedPhoto, savePhotos } from "./photos.js";
 import type { AgentTool, ToolContext, ToolOutcome } from "./tools.js";
 
@@ -20,6 +20,7 @@ export const PageContent = z.object({
   business: text(80, "The kind of business, e.g. 'neighbourhood bakery', 'SEO agency'"),
   name: text(60, "The business's name. If the user gave none, choose a fitting one"),
   direction: z.enum(DESIGN_DIRECTIONS.map((d) => d.id) as [string, ...string[]]).optional().describe("Leave out to get the look that suits the business"),
+  references: z.array(z.string().url()).max(3).optional().describe("Links the user gave as design examples (\"make it look like …\"). Their colours, corners and fonts are measured and used; their text and pictures are not. Only links from the user's message"),
   url: z.string().url().optional().describe("The site's address, only if the user gave it"),
   seo: z.object({
     phrase: text(60, "What people type into a search engine to find this, e.g. 'bakery in Sarajevo'"),
@@ -229,6 +230,8 @@ export function placeholders(html: string): string[] {
 export interface PageBuilderConfig {
   /** Present when the user allows web access: pictures are searched for and saved. */
   photos?: PhotoConfig;
+  /** Present when the user allows web access: opens a reference link and measures its look. */
+  reference?: (url: string, signal?: AbortSignal) => Promise<ReferenceLook | undefined>;
 }
 
 export function designKitTool(cfg: PageBuilderConfig = {}): AgentTool {
@@ -242,7 +245,26 @@ export function designKitTool(cfg: PageBuilderConfig = {}): AgentTool {
       const targets = ["index.html", "styles.css", "script.js"];
       const own = targets.filter((p) => existsSync(ctx.workspace.resolve(p)) && !ctx.createdThisRun?.has(p));
       if (own.length) return { ok: false, content: `${own.join(", ")} already exist${own.length === 1 ? "s" : ""} and wasn't made in this task: this project has its own page and styles. Change those with edit_file and follow their conventions instead of the kit.` };
-      const d = pickDirection(c.business, c.direction);
+      let d = pickDirection(c.business, c.direction);
+      let styled = "";
+      if (c.references?.length) {
+        if (!cfg.reference) styled = " The reference links were not opened: web access is off for this run.";
+        for (const url of cfg.reference ? c.references : []) {
+          let like: DesignDirection | undefined;
+          try {
+            const look = await cfg.reference!(url, ctx.signal);
+            like = look && directionFromReference(look);
+          } catch {
+            like = undefined;
+          }
+          if (like) {
+            d = like;
+            styled = ` Its colours, corners and fonts were measured on ${url}; the words and pictures are this page's own.`;
+            break;
+          }
+          styled = ` ${url} could not be measured, so the look follows the business instead.`;
+        }
+      }
       const photos: PagePhotos = { gallery: [] };
       const missing: string[] = [];
       if (cfg.photos) {
@@ -283,7 +305,7 @@ export function designKitTool(cfg: PageBuilderConfig = {}): AgentTool {
         ok: true,
         edited: true,
         change: { path: "index.html", before: before.get("index.html") ?? null },
-        content: `Built the page in the "${d.name}" direction: index.html (${html.split("\n").length - 1} lines, 10 sections: hero, ${c.offer.label}, ${c.story.label}, ${c.steps.label}, gallery, quote, questions, call to action, contact, footer), styles.css, script.js and assets/logo.svg.\n${pictures}\n${open.length ? `Left for the user to fill in: ${open.join(", ")}.` : "Nothing was left in [brackets]."}\n\nThe page is finished: don't rewrite it or its stylesheet. You'll be shown how it looks; change wording, a picture or a detail with edit_file on index.html. Rules only this page needs go at the end of styles.css. In your final answer say what was built, that the name, prices, story and product details are draft copy you wrote for the owner to confirm, what is in [brackets], and that the form isn't connected to an inbox yet${c.url ? "" : "; and that the canonical link and share image need the site's address"}.`,
+        content: `Built the page in the "${d.name}" direction.${styled} Files: index.html (${html.split("\n").length - 1} lines, 10 sections: hero, ${c.offer.label}, ${c.story.label}, ${c.steps.label}, gallery, quote, questions, call to action, contact, footer), styles.css, script.js and assets/logo.svg.\n${pictures}\n${open.length ? `Left for the user to fill in: ${open.join(", ")}.` : "Nothing was left in [brackets]."}\n\nThe page is finished: don't rewrite it or its stylesheet. You'll be shown how it looks; change wording, a picture or a detail with edit_file on index.html. Rules only this page needs go at the end of styles.css. In your final answer say what was built, that the name, prices, story and product details are draft copy you wrote for the owner to confirm, what is in [brackets], and that the form isn't connected to an inbox yet${c.url ? "" : "; and that the canonical link and share image need the site's address"}.`,
       };
     },
   } as AgentTool;

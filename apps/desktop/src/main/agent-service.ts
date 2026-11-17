@@ -5,6 +5,7 @@ import {
   type AgentEvent,
   type AgentOptions,
   type AgentTool,
+  type ReferenceLook,
   type ApprovalRequest,
   type ChatMessage,
   type ChatModel,
@@ -207,6 +208,8 @@ export interface AgentServiceDeps {
   openFile?: (path: string) => Promise<void>;
   /** Renders a web page the agent built and reports what it looks like (screenshots, measurable problems). */
   lookAtPage?: (path: string, signal?: AbortSignal) => Promise<PageLook | undefined>;
+  /** Opens a link the user gave as a design example and measures its colours, fonts and corners. */
+  measureReference?: (url: string, signal?: AbortSignal) => Promise<ReferenceLook | undefined>;
   createModel?: (settings: StoredSettings) => ChatModel;
   fetch?: typeof fetch;
   /** Scale a downloaded photo down to a web size (JPEG). */
@@ -539,7 +542,7 @@ export class AgentService implements Omit<AgentApi, "onStatus" | "onApproval" | 
       // With web access the page builder finds and places photos itself; find_photos is for swapping one afterwards.
       const photos = { ...(this.deps.fetch ? { fetch: this.deps.fetch } : {}), ...(this.deps.resizeImage ? { resize: this.deps.resizeImage } : {}) };
       const kit = tools.findIndex((t) => t.name === "design_kit");
-      if (kit >= 0) tools[kit] = designKitTool({ photos });
+      if (kit >= 0) tools[kit] = designKitTool({ photos, ...(this.deps.measureReference ? { reference: this.deps.measureReference } : {}) });
       // The same for apps: the app kit fetches pictures for its sample rows.
       const appKit = tools.findIndex((t) => t.name === "app_kit");
       if (appKit >= 0) tools[appKit] = appKitTool({ photos });

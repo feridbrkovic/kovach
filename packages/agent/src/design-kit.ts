@@ -118,6 +118,68 @@ export const DESIGN_DIRECTIONS: DesignDirection[] = [
 const DEFAULT_DIRECTION = "calm-professional";
 
 /** The direction for a kind of business: the one asked for by id, else the first whose words match. */
+/** What a reference site looks like, measured in a browser: its colours, fonts and corners. */
+export interface ReferenceLook {
+  url: string;
+  background: string;
+  text: string;
+  accent: string;
+  onAccent?: string | undefined;
+  fontDisplay?: string | undefined;
+  fontBody?: string | undefined;
+  /** Corner radius of its buttons, in px. */
+  radius?: number | undefined;
+}
+
+const HEX = /^#[0-9a-f]{6}$/i;
+const channels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+const luminance = (hex: string) => {
+  const [r, g, b] = channels(hex).map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+};
+const mix = (a: string, b: string, share: number) => {
+  const [x, y] = [channels(a), channels(b)];
+  return `#${x.map((v, i) => Math.round(v + (y[i]! - v) * share).toString(16).padStart(2, "0")).join("")}`;
+};
+
+/**
+ * A direction in the style of a reference site: its colours, corners and font names on top of
+ * the built-in direction closest to it. It takes the design language only; the reference's
+ * text, pictures and logo are never used.
+ */
+export function directionFromReference(ref: ReferenceLook): DesignDirection | undefined {
+  if (![ref.background, ref.text, ref.accent].every((c) => HEX.test(c))) return undefined;
+  const serif = /serif|georgia|times|garamond|playfair|fraunces|baskerville|didot/i.test(ref.fontDisplay ?? "") && !/sans/i.test(ref.fontDisplay ?? "");
+  const baseId = luminance(ref.background) < 0.2 ? "dark-studio" : serif ? "warm-editorial" : "bold-modern";
+  const base = DESIGN_DIRECTIONS.find((d) => d.id === baseId)!;
+  const family = (name: string | undefined, fallback: string | undefined) => (name && /^[\w .-]{2,40}$/.test(name) && fallback ? `"${name}", ${fallback}` : fallback);
+  let host = ref.url;
+  try {
+    host = new URL(ref.url).hostname.replace(/^www\./, "");
+  } catch {
+    // keep the text as given
+  }
+  const tokens: Record<string, string> = {
+    ...base.tokens,
+    "--paper": ref.background,
+    "--paper-2": mix(ref.background, ref.text, 0.06),
+    "--ink": ref.text,
+    "--ink-2": mix(ref.text, ref.background, 0.35),
+    "--line": mix(ref.background, ref.text, 0.16),
+    "--accent": ref.accent,
+    "--accent-ink": ref.onAccent && HEX.test(ref.onAccent) ? ref.onAccent : luminance(ref.accent) > 0.45 ? "#111111" : "#ffffff",
+  };
+  const display = family(ref.fontDisplay, base.tokens["--font-display"]);
+  const body = family(ref.fontBody, base.tokens["--font-body"]);
+  if (display) tokens["--font-display"] = display;
+  if (body) tokens["--font-body"] = body;
+  if (ref.radius !== undefined && ref.radius >= 0) tokens["--radius"] = `${Math.min(Math.round(ref.radius), 24)}px`;
+  return { ...base, id: `like-${host}`, name: `In the style of ${host}`, look: `Colours, corners and fonts measured on ${host}, on the ${base.name.toLowerCase()} layout.`, tokens };
+}
+
 export function pickDirection(business: string, id?: string): DesignDirection {
   return (
     DESIGN_DIRECTIONS.find((d) => d.id === id) ??
