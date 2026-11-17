@@ -284,7 +284,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
         if (outcome.ok && !existsSync(workspace.resolve("node_modules/expo/package.json"))) outcome = await step("Installing the project's packages", "npm install --no-audit --no-fund");
         startWithAppKit = outcome.ok;
         const note = outcome.ok
-          ? "The Expo project now exists: it was created with `npx create-expo-app@latest` (current SDK, versions and layout; its AGENTS.md says what changed in this SDK). Don't write package.json or the template files yourself. Call app_kit now with the app's name, its bundle identifier, whether users sign in, and its main features (kebab-case names)."
+          ? "The Expo project now exists: it was created with `npx create-expo-app@latest` (current SDK, versions and layout; its AGENTS.md says what changed in this SDK). Don't write package.json or the template files yourself. Call app_kit now with the app's name, whether users sign in, and its main features (kebab-case names); add the bundle identifier only if the user gave one. Don't stop to ask questions first."
           : `Creating the Expo project failed:\n${outcome.content.slice(0, 1500)}\n\nDon't write the project by hand. Tell the user what is needed (network access and approval to run \`npx create-expo-app@latest\`) and stop.`;
         messages.push({ role: "user", content: note });
         record("tool", note);
@@ -347,11 +347,16 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
       // (models copy the "Plan: …" format from earlier turns). Ask once to carry it out.
       // Or only an announcement of the next step ("Let me check the code.") with nothing done.
       // Or just a tool's name ("Search", "read_file"): a call that came out as text, not an answer.
+      // Or a question or an explanation while a kit is the only tool on offer: the model stopped to
+      // ask for something the kit fills in itself (seen live: the run ended on "what bundle identifier?").
       const fragment = isToolName(res.content, tools);
-      const stall = res.toolCalls.length > 0 ? undefined : !res.content.trim() ? "empty" : fragment ? "fragment" : isPlanEcho(res.content) ? "echo" : isAnnouncement(res.content) ? "announcement" : undefined;
+      const asked = kitOnly && !edited && res.toolCalls.length === 0 && !!res.content.trim();
+      const stall = res.toolCalls.length > 0 ? undefined : asked ? `asked:${forced}` : !res.content.trim() ? "empty" : fragment ? "fragment" : isPlanEcho(res.content) ? "echo" : isAnnouncement(res.content) ? "announcement" : undefined;
       if (stall && !actNudges.has(stall)) {
         actNudges.add(stall);
-        const nudge = !res.content.trim()
+        const nudge = asked
+          ? `Don't stop to ask or explain: call ${forced} now with what the user has told you. Leave out anything optional you don't know; the tool fills in a placeholder and reports it, and you pass that on in your answer.`
+          : !res.content.trim()
           ? "Your reply was empty. Use the tools to do the task, then give your answer."
           : fragment
             ? "That isn't an answer yet. Use the tools if you need them, then answer in full."

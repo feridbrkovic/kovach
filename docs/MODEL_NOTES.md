@@ -19,6 +19,7 @@ What this model gets wrong when it drives the agent, and what the code does abou
 | Chases a wrong measurement for minutes | Measurements are tested against real pages; the scroll check jumps instead of gliding | `page-findings.ts` |
 | Writes stale library APIs from memory | Docs packs matched to the project's versions; the plan starts with a lookup when a library is named; the project's AGENTS.md is read | `memory-service/docs`, `prompt.ts`, playbooks |
 | Hand-writes project scaffolding with old versions | New Expo apps are created with `create-expo-app`, then `app_kit` adds the architecture; packages go through `expo install` | `app-kit.ts`, playbooks |
+| Stops to ask for a detail ("what bundle identifier?") while a kit is the forced step, which ended the run | The kit takes a placeholder for anything optional and reports it; a text reply at that point is sent back once with "call the tool now" | `app-kit.ts` (`placeholderBundleId`), `loop.ts` |
 | Saves its answer to a file when asked a question and told not to change anything | File-writing tools are not offered for such requests | `loop.ts` (`isReadOnlyRequest`) |
 
 ## When adding a safeguard

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type ChatModel, iconFor, kitFiles, kitPackages, pickPlaybooks, renderPlaybooks, runAgentTask, TOOLS, wireProviders, Workspace } from "../src/index.js";
+import { type ChatModel, iconFor, kitFiles, kitPackages, pickPlaybooks, placeholderBundleId, renderPlaybooks, runAgentTask, TOOLS, wireProviders, Workspace } from "../src/index.js";
 import type { ToolContext } from "../src/tools.js";
 
 let dir: string;
@@ -173,5 +173,41 @@ describe("app kit", () => {
     expect(offered[0]).toEqual(["app_kit"]);
     expect(offered[1]).toContain("edit_file");
     expect(existsSync(join(dir, "src/features/bookings/bookings-screen.tsx"))).toBe(true);
+  });
+  it("doesn't let the run end on a question while app_kit is the only step on offer", async () => {
+    const runCommand = {
+      ...TOOLS.find((t) => t.name === "run_command")!,
+      async run() {
+        if (!existsSync(join(dir, "app.json"))) expoProject(); // only the generator creates the project
+        return { ok: true, exitCode: 0, content: "exit 0" };
+      },
+    };
+    const notes: string[] = [];
+    let turn = 0;
+    const { bundleId: _none, ...withoutId } = INPUT;
+    const model: ChatModel = {
+      id: "test",
+      async complete(req) {
+        if (req.jsonSchema) return { content: JSON.stringify({ title: "Brico app", brief: { goal: "g", deliverables: [], requirements: [], acceptance: [], outOfScope: [], assumptions: [] }, summary: "An app.", steps: [{ title: "Build it", files: [] }] }), toolCalls: [] };
+        notes.push(String(req.messages.at(-1)!.content));
+        turn++;
+        if (turn === 1) return { content: "I need a bundle identifier for the app. Do you have a domain you'd like to use?", toolCalls: [] };
+        if (turn === 2) return { content: "", toolCalls: [{ id: "k", name: "app_kit", arguments: JSON.stringify(withoutId) }] };
+        return { content: "The app is set up. The bundle identifier com.example.brico is a placeholder.", toolCalls: [] };
+      },
+    };
+    const outcome = await runAgentTask({ model, workspace: new Workspace(dir), task: "Build a mobile app for booking barbers, called Brico", approve: async () => true, checks: [], review: false, tools: [...TOOLS.filter((t) => t.name !== "run_command"), runCommand as never] });
+    expect(outcome.status).toBe("done");
+    expect(notes[1]).toMatch(/^Don't stop to ask or explain: call app_kit now/);
+    const config = JSON.parse(readFileSync(join(dir, "app.json"), "utf8")) as { expo: { ios: { bundleIdentifier: string }; android: { package: string } } };
+    expect(config.expo.ios.bundleIdentifier).toBe("com.example.brico");
+    expect(config.expo.android.package).toBe("com.example.brico");
+    expect(outcome.message).toContain("placeholder");
+  });
+
+  it("makes a valid placeholder identifier from any name", () => {
+    expect(placeholderBundleId("Brico")).toBe("com.example.brico");
+    expect(placeholderBundleId("Šišanje & Co.")).toBe("com.example.sisanjeco");
+    expect(placeholderBundleId("2Go")).toBe("com.example.app2go");
   });
 });

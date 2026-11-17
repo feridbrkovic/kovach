@@ -17,7 +17,8 @@ export const AppKitInput = z.object({
   bundleId: z
     .string()
     .regex(/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$/)
-    .describe("Reverse-domain identifier used on both stores, e.g. 'ba.input.barber'. Ask the user if you don't know their domain"),
+    .optional()
+    .describe("Reverse-domain identifier used on both stores, e.g. 'ba.input.barber'. Leave it out when the user hasn't given one: a placeholder made from the name is used and reported. Don't stop to ask for it"),
   auth: z.boolean().default(false).describe("true when users sign in"),
   features: z
     .array(z.object({ name: z.string().regex(/^[a-z][a-z0-9-]*$/).describe("kebab-case, e.g. 'bookings'"), purpose: z.string().min(3).max(120) }))
@@ -26,6 +27,15 @@ export const AppKitInput = z.object({
     .describe("The app's main areas; each gets a feature folder with its data access, hook and screen"),
 });
 export type AppKitInput = z.output<typeof AppKitInput>;
+
+/** Used until the user names their own: valid on both stores, and plainly a placeholder. */
+export function placeholderBundleId(name: string): string {
+  const slug = name
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  return `com.example.${/^[a-z]/.test(slug) ? slug : `app${slug}`}`;
+}
 
 const pascal = (kebab: string) => kebab.replace(/(^|-)([a-z0-9])/g, (_m, _d, c: string) => c.toUpperCase());
 const camel = (kebab: string) => pascal(kebab).replace(/^./, (c) => c.toLowerCase());
@@ -1095,10 +1105,14 @@ export function appKitTool(): AgentTool {
           const android = ((expo.android as Record<string, unknown> | undefined) ??= {});
           expo.ios = ios;
           expo.android = android;
-          ios.bundleIdentifier ??= input.bundleId;
-          android.package ??= input.bundleId;
+          const bundleId = input.bundleId ?? placeholderBundleId(input.name);
+          ios.bundleIdentifier ??= bundleId;
+          android.package ??= bundleId;
           writeFileSync(ctx.workspace.resolve("app.json"), `${JSON.stringify(config, null, 2)}\n`, "utf8");
           identity = `app.json: name "${input.name}", ios.bundleIdentifier and android.package "${String(ios.bundleIdentifier)}".`;
+          if (!input.bundleId && ios.bundleIdentifier === bundleId) {
+            identity += ` That identifier is a placeholder: say so in your answer, and that it must be changed to the user's own (reverse domain, e.g. ba.company.app) before the first store build, because it can't be changed after publishing.`;
+          }
         } catch {
           // leave a config we can't parse alone
         }

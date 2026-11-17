@@ -77,5 +77,5 @@ export { pickPlaybooks, PLAYBOOKS, type Playbook, renderPlaybooks } from "./play
 export { DESIGN_DIRECTIONS, KIT_JS, PAGE_RULES_MARKER, PAGE_SCRIPT_MARKER, logoSvg, kitCss, kitMarkup, pickDirection, type DesignDirection } from "./design-kit.js";
 export { photoTools, searchPhotos, type FoundPhoto, type PhotoConfig } from "./photos.js";
 export { designKitTool, PageContent, placeholders, renderPage, type PageBuilderConfig, type PagePhotos } from "./page-builder.js";
-export { AppKitInput, appKitTool, EAS_JSON, iconFor, kitFiles, kitPackages, wireProviders } from "./app-kit.js";
+export { AppKitInput, appKitTool, EAS_JSON, iconFor, kitFiles, kitPackages, placeholderBundleId, wireProviders } from "./app-kit.js";
 export { wantsNewApp, wantsNewPage } from "./playbooks.js";
