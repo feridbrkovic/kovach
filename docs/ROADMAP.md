@@ -112,6 +112,22 @@ Built and tested ahead of their phases so the app is useful now:
 
 ## After the MVP
 
+- [ ] **Working in a team's codebase** (next):
+  - [ ] Workspace map: a compact outline of the repository (packages, entry points, key symbols) built with Tree-sitter, kept fresh, and added to the plan within a token budget instead of read file by file
+  - [ ] Read first: before the first edit in an existing project the loop collects the files the change touches, their tests and callers (impact), and the commands CI runs
+  - [ ] Git as tools: status, diff, branch, commit with the repository's message style, log and blame for "why is this here"; work on a branch, never on the default one; push and pull requests only on request
+  - [ ] Team context: read `AGENTS.md`, `CONTRIBUTING.md`, CODEOWNERS, CI workflows and open pull requests; follow the project's review and test conventions
+  - [ ] `read_files`: several files in one call (live runs spend a turn per file)
+- [ ] **More playbooks and kits**:
+  - [ ] Backend: REST and GraphQL APIs (Node, Laravel), database migrations, auth, background jobs, observability, twelve-factor config
+  - [ ] Payments: Stripe, plus the gateways used locally; webhooks, idempotency, test mode only until the user goes live
+  - [ ] Business and project flows: requirements to tickets, estimates, release checklists, handover notes
+  - [ ] UI/UX: design tokens to components, motion guidelines, 3D (three.js on the web, Reanimated and Skia in apps)
+- [ ] **Faster and smarter on the same Mac**:
+  - [ ] Keep the prompt cache warm: stable prompt prefix, tool list fixed per run, trimmed history appended not rewritten; measure tokens per turn in the eval report
+  - [ ] Speculative decoding or a draft model on oMLX if supported; 6-bit versus 4-bit quality check on the eval set
+  - [ ] Second model for hard steps (A2) and best-of-N for stubborn bugs (A3)
+  - [ ] End-to-end eval set of real tasks, run before and after every change to prompts or tools
 - [ ] **Phase 6 — Skills (teach by research)** (~2 weeks): `/learn`, research job, draft review, skill library, Agent Skills import
 - [ ] **Phase 9 — Knowledge library: your projects + quality standards** (~3 weeks, after Phase 6):
   - [ ] Opt-in project folders: Tree-sitter code chunks, docs, configs and commit messages; secret scan; file watching

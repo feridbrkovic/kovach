@@ -60,10 +60,10 @@ Local Kovach is not a general chat assistant with a terminal attached. Every par
 - **Web pages and landing pages.** The model supplies the content; a page builder renders a full page in one of four design directions, with a logo mark, motion, form validation and search-engine tags. With web access on, it finds stock photos under public-domain or attribution licences and writes the credits. The page is then opened in a headless browser at phone and desktop widths, and measured problems go back to the model. Facts only the owner knows are left as `[placeholders]`, never invented.
 - **React Native apps.** A new app is created with Expo's own generator, then an app kit adds the architecture: one API client with zod validation, TanStack Query, design tokens, accessible UI primitives, a folder per feature with list and detail screens, optional sign-in with the token in secure storage, navigation and EAS build profiles. Playbooks cover React Native, native iOS and Android, and building, signing and store submission. It prepares a release; you publish it.
 
-**An app from the app kit.** One request ("a barber booking app with sign-in, barbers and my bookings"): a look chosen from the kind of business, icons, rows that fade in and lean under the finger, stock photos for the sample data, and a detail screen with a hero image.
+**An app from the app kit.** Built by Local Kovach in one run of about fifteen minutes from "a barber booking app with sign-in, a list of barbers with photos and my bookings": a look chosen for the app, icons, rows that fade in and lean under the finger, stock photos for the sample data, a detail screen with a hero image. It typechecks clean and passes `expo-doctor`.
 
 <p align="center">
-  <img src="docs/assets/readme/result-app.png" alt="Generated app screens in a dark look: sign-in, a list of barbers with photos, a barber's detail screen with a hero image and facts, and the bookings list" width="900">
+  <img src="docs/assets/readme/result-app.png" alt="Generated app screens: sign-in, a list of barbers with photos, a barber's detail screen with a hero image and facts, and the bookings list" width="900">
 </p>
 
 **A landing page from the page builder**, top to bottom as it was generated. Square brackets mark the facts only the owner knows.
@@ -179,7 +179,7 @@ docs/                      Roadmap, model notes, assets
 
 ## What is next
 
-Skills learned by research (`/learn <topic>`), connectors and automations over MCP, a stronger second model for hard tasks, simulator and device control, and a phone companion app. See the [roadmap](docs/ROADMAP.md).
+Working inside a team's repository (a workspace map, git as tools, pull requests), playbooks for backend work and payments, skills learned by research (`/learn <topic>`), connectors and automations over MCP, a stronger second model for hard tasks, desktop control with a small GUI-grounding model (UI-Venus) next to the main one, simulator and device control, and a phone companion app. See the [roadmap](docs/ROADMAP.md).
 
 ## Contributing and security
 
