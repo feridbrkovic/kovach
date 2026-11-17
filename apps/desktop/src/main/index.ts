@@ -320,23 +320,30 @@ function runEvalsFromMenu(root: string): void {
 /** File › Free Up Space: removes installed packages and build output from the sessions' scratch folders. */
 async function freeUpSpaceFromMenu(): Promise<void> {
   const root = join(app.getPath("userData"), "scratch");
-  const usage = scratchUsage(root);
-  if (usage.regrowableBytes === 0) {
-    await dialog.showMessageBox({ message: "Nothing to free", detail: `Sessions without a project use ${formatBytes(usage.bytes)} in ${usage.sessions} folders, none of it installed packages or build output.` });
-    return;
+  // Attached to the window as a sheet, so it can't end up behind it.
+  const parent = BrowserWindow.getAllWindows()[0];
+  const show = (options: Electron.MessageBoxOptions) => (parent ? dialog.showMessageBox(parent, options) : dialog.showMessageBox(options));
+  try {
+    const usage = scratchUsage(root);
+    if (usage.regrowableBytes === 0) {
+      await show({ message: "Nothing to free", detail: `Sessions without a project use ${formatBytes(usage.bytes)} in ${usage.sessions} folders, none of it installed packages or build output.` });
+      return;
+    }
+    const answer = await show({
+      type: "question",
+      message: `Free ${formatBytes(usage.regrowableBytes)}?`,
+      detail: `Sessions without a project use ${formatBytes(usage.bytes)} in ${usage.sessions} folders. ${formatBytes(usage.regrowableBytes)} of that is installed packages and build output, which come back with an install or a build. The files the sessions wrote stay.`,
+      buttons: ["Remove", "Cancel"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (answer.response !== 0) return;
+    const active = await agent?.activeRun();
+    const freed = freeScratchSpace(root, active?.sessionId);
+    await show({ message: `Freed ${formatBytes(freed.freedBytes)}`, detail: active ? "The session that is running was left alone." : "" });
+  } catch (err) {
+    await show({ type: "error", message: "Couldn't free up space", detail: err instanceof Error ? err.message : String(err) });
   }
-  const answer = await dialog.showMessageBox({
-    type: "question",
-    message: `Free ${formatBytes(usage.regrowableBytes)}?`,
-    detail: `Sessions without a project use ${formatBytes(usage.bytes)} in ${usage.sessions} folders. ${formatBytes(usage.regrowableBytes)} of that is installed packages and build output, which come back with an install or a build. The files the sessions wrote stay.`,
-    buttons: ["Remove", "Cancel"],
-    defaultId: 0,
-    cancelId: 1,
-  });
-  if (answer.response !== 0) return;
-  const active = await agent?.activeRun();
-  const freed = freeScratchSpace(root, active?.sessionId);
-  await dialog.showMessageBox({ message: `Freed ${formatBytes(freed.freedBytes)}`, detail: active ? "The session that is running was left alone." : "" });
 }
 
 function installMenu(): void {

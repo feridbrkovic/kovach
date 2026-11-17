@@ -24,8 +24,14 @@ function sizeOf(path: string): number {
     return 0;
   }
   if (!info.isDirectory()) return info.size;
+  let names: string[];
+  try {
+    names = readdirSync(path);
+  } catch {
+    return 0; // a folder that can't be read is not counted, and not a reason to fail
+  }
   let total = 0;
-  for (const name of readdirSync(path)) total += sizeOf(join(path, name));
+  for (const name of names) total += sizeOf(join(path, name));
   return total;
 }
 
@@ -52,7 +58,12 @@ export function freeScratchSpace(root: string, keepSessionId?: string): { freedB
       const path = join(root, id, rel);
       const size = sizeOf(path);
       if (size === 0 && !existsSync(path)) continue;
-      rmSync(path, { recursive: true, force: true });
+      try {
+        // Large package folders now and then report "not empty" halfway through; a retry clears them.
+        rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      } catch {
+        continue; // one stubborn folder must not keep the others
+      }
       freedBytes += size;
       folders++;
     }
