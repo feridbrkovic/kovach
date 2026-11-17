@@ -1,0 +1,32 @@
+# Dependencies and builds
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local data
+*.db
+*.db-wal
+*.db-shm
+evals/private/
+infra/searxng/data/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Script output
+logs/
+
+# Local test projects
+playground/

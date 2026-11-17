@@ -1,0 +1,17 @@
+# Minimal SearXNG settings for Local Kovach. See https://docs.searxng.org/admin/settings/
+use_default_settings: true
+
+server:
+  # Replace before first run:  openssl rand -hex 32
+  secret_key: "change-me"
+  limiter: false          # local use only, bound to 127.0.0.1
+  image_proxy: false
+
+search:
+  safe_search: 0
+  formats:
+    - html
+    - json                # Local Kovach reads results as JSON
+
+outgoing:
+  request_timeout: 5.0
