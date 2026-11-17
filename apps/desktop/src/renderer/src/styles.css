@@ -1057,6 +1057,71 @@ code {
   background: var(--text);
   color: var(--bg);
 }
+.send-group {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+.send-group .send {
+  margin-left: 0;
+}
+.queue {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  font-size: 13px;
+}
+.queue-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.queue ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.queue li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+}
+.queue li::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ember);
+}
+.queue-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.queue .remove {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
 .attachments {
   list-style: none;
   display: flex;
@@ -2261,4 +2326,17 @@ dd .evidence {
 .session-files-actions {
   display: flex;
   gap: 8px;
+}
+
+.link-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--ember);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.link-btn:hover {
+  text-decoration: underline;
 }

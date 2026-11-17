@@ -10,6 +10,7 @@ import { type MemoryFocus, MemoryView } from "./components/MemoryView";
 import { SessionView } from "./components/SessionView";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { Sidebar, untitled } from "./components/Sidebar";
+import { isStillRunning, type QueuedMessage, queuedFor, queueId } from "./queue";
 import { reduceRun, type RunOutcome, type RunState } from "./run-state";
 
 export interface AppProps {
@@ -52,6 +53,20 @@ export function App({ api, agent, source, now = Date.now, searchDelay = 200 }: A
 
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
+  const viewRef = useRef(view);
+  viewRef.current = view;
+
+  // Messages written while a task runs wait here and go out one by one as tasks finish.
+  const [queue, setQueueState] = useState<QueuedMessage[]>([]);
+  const queueRef = useRef<QueuedMessage[]>([]);
+  const setQueue = (update: (q: QueuedMessage[]) => QueuedMessage[]) => {
+    queueRef.current = update(queueRef.current);
+    setQueueState(queueRef.current);
+  };
+  const [queuePaused, setQueuePaused] = useState(false);
+  const [queueError, setQueueError] = useState<string | undefined>();
+  const draining = useRef(false);
+  const runRef = useRef<RunState | undefined>(undefined);
 
   const loadFirstPage = useCallback(async () => {
     try {
@@ -84,6 +99,7 @@ export function App({ api, agent, source, now = Date.now, searchDelay = 200 }: A
     void agent.getSettings().then(setSettings);
     void agent.activeRun().then((ref) => ref && setRun((r) => r ?? ref));
     const offStatus = agent.onStatus((e) => {
+      runRef.current = reduceRun(runRef.current, e);
       setRun((r) => reduceRun(r, e));
       if (e.type === "started") setRunStartedAt(Date.now());
       if (e.type === "started") setOutcomes(({ [e.sessionId]: _drop, ...rest }) => rest);
@@ -91,6 +107,10 @@ export function App({ api, agent, source, now = Date.now, searchDelay = 200 }: A
         setOutcomes((o) => ({ ...o, [e.sessionId]: { status: e.status, message: e.message } }));
         setApproval((a) => (a?.runId === e.runId ? undefined : a));
         if (e.sessionId === selectedRef.current) setRevision((r) => r + 1);
+        // A stopped task holds the queue: the user may not want what they wrote next anymore.
+        if (e.status === "aborted") {
+          if (queueRef.current.length) setQueuePaused(true);
+        } else setTimeout(() => void drainRef.current(), 0);
       }
     });
     const offApproval = agent.onApproval(setApproval);
@@ -160,6 +180,67 @@ export function App({ api, agent, source, now = Date.now, searchDelay = 200 }: A
     ...(input.computerUse ? { computerUse: true } : {}),
     ...(input.allowFailingChecks ? { allowFailingChecks: true } : {}),
   });
+
+  /** Starts the oldest queued message, if nothing is running. */
+  const drain = async () => {
+    if (!agent || draining.current || runRef.current) return;
+    const next = queueRef.current[0];
+    if (!next) return;
+    draining.current = true;
+    try {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const ref = await agent.start({
+            ...startInput(next.input),
+            ...(next.sessionId ? { sessionId: next.sessionId } : next.projectId ? { projectId: next.projectId } : {}),
+          });
+          setQueue((q) => q.filter((m) => m.id !== next.id));
+          setQueueError(undefined);
+          // A queued new task opens if the user is waiting on the start screen for it.
+          if (!next.sessionId && viewRef.current === "new") select(ref.sessionId);
+          return;
+        } catch (err) {
+          // The previous task can take a moment to let go after it reported finishing.
+          if (isStillRunning(err) && attempt < 20) {
+            await new Promise((r) => setTimeout(r, 250));
+            continue;
+          }
+          setQueueError(err instanceof Error ? err.message : String(err));
+          setQueuePaused(true);
+          return;
+        }
+      }
+    } finally {
+      draining.current = false;
+    }
+  };
+  const drainRef = useRef(drain);
+  drainRef.current = drain;
+
+  const enqueue = (message: Omit<QueuedMessage, "id">) => {
+    setQueue((q) => [...q, { ...message, id: queueId() }]);
+    // The task may have ended while the message was being written.
+    if (!runRef.current && !queuePaused) setTimeout(() => void drainRef.current(), 0);
+  };
+  const unqueue = (id: string) => {
+    setQueue((q) => q.filter((m) => m.id !== id));
+    if (queueRef.current.length === 0) {
+      setQueuePaused(false);
+      setQueueError(undefined);
+    }
+  };
+  const resumeQueue = () => {
+    setQueuePaused(false);
+    setQueueError(undefined);
+    void drainRef.current();
+  };
+  const queueProps = (sessionId: string | undefined) => ({
+    queued: queuedFor(queue, sessionId),
+    onUnqueue: unqueue,
+    queuePaused,
+    queueError,
+    onResumeQueue: resumeQueue,
+  });
   const addProject = async () => {
     if (!agent) return undefined;
     const p = await agent.addProject();
@@ -216,7 +297,9 @@ export function App({ api, agent, source, now = Date.now, searchDelay = 200 }: A
                 projectId={newProjectId}
                 onProjectChange={setNewProjectId}
                 onAddProject={addProject}
-                disabledReason={run ? `Another task is running in “${runningTitle}”.` : undefined}
+                queueing={!!run || (queuePaused && queue.length > 0)}
+                onQueue={(input) => enqueue({ input, projectId: newProjectId })}
+                {...queueProps(undefined)}
                 computerUse={settings?.computerUse ?? false}
                 autoFocus
                 onSubmit={async (input) => {
@@ -245,6 +328,12 @@ export function App({ api, agent, source, now = Date.now, searchDelay = 200 }: A
                     approval,
                     outcome: outcomes[selectedId],
                     busyElsewhere: run && run.sessionId !== selectedId ? runningTitle : undefined,
+                    queueing: !!run || (queuePaused && queue.length > 0),
+                    onQueue: (input: ComposerSubmit) => {
+                      setFocusMessageId(undefined);
+                      enqueue({ input, sessionId: selectedId });
+                    },
+                    ...queueProps(selectedId),
                     computerUse: settings?.computerUse ?? false,
                     onSend: async (input) => {
                       // A message opened from search or evidence was for reading; a new turn goes to the end.

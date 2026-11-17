@@ -1,5 +1,6 @@
 import { type ClipboardEvent, type DragEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import type { AgentApi, ImageAttachment, ProjectInfo } from "../../../shared/agent";
+import type { QueuedMessage } from "../queue";
 import { ArrowUpIcon, MonitorIcon, PaperclipIcon, StopIcon, XIcon } from "./icons";
 
 const TYPES: ImageAttachment["mediaType"][] = ["image/png", "image/jpeg", "image/webp", "image/gif"];
@@ -24,6 +25,16 @@ export interface ComposerProps {
   disabledReason?: string | undefined;
   running?: boolean;
   onStop?: () => void;
+  /** A task is running somewhere: sending puts the message in the queue instead. */
+  queueing?: boolean;
+  onQueue?: (input: ComposerSubmit) => void;
+  /** Messages waiting for this composer's session (or, on the start screen, new tasks). */
+  queued?: QueuedMessage[];
+  onUnqueue?: (id: string) => void;
+  /** The queue stopped because the user stopped a task; it waits to be told to go on. */
+  queuePaused?: boolean;
+  queueError?: string | undefined;
+  onResumeQueue?: () => void;
   computerUse: boolean;
   placeholder?: string;
   autoFocus?: boolean;
@@ -53,7 +64,9 @@ export function Composer(props: ComposerProps) {
     el.style.height = `${Math.min(el.scrollHeight, 280)}px`;
   }, [text]);
 
-  const blocked = !!props.disabledReason || !!props.running;
+  /** Sending now would wait in the queue. */
+  const queues = !!props.onQueue && (!!props.running || !!props.queueing);
+  const blocked = !!props.disabledReason || (!!props.running && !queues);
 
   const addFiles = async (files: Iterable<File>) => {
     setError(undefined);
@@ -75,8 +88,14 @@ export function Composer(props: ComposerProps) {
   const submit = async (e?: FormEvent) => {
     e?.preventDefault();
     if (blocked || sending || !text.trim()) return;
-    setSending(true);
     setError(undefined);
+    if (queues) {
+      props.onQueue!({ text, images: images.map(({ url: _u, ...img }) => img), computerUse: computer, allowFailingChecks: allowFailing });
+      setText("");
+      setImages([]);
+      return;
+    }
+    setSending(true);
     try {
       await props.onSubmit({
         text,
@@ -111,6 +130,53 @@ export function Composer(props: ComposerProps) {
         void addFiles(e.dataTransfer.files);
       }}
     >
+      {props.queued && props.queued.length > 0 && (
+        <section className="queue" aria-label="Queued messages">
+          <p className="queue-head">
+            <span>
+              {props.queuePaused
+                ? props.queueError
+                  ? `Not sent: ${props.queueError}`
+                  : "Waiting: the task was stopped."
+                : props.queued.length === 1
+                  ? "Sent when the current task finishes."
+                  : `Sent one after another when the current task finishes.`}
+            </span>
+            {props.queuePaused && props.onResumeQueue && (
+              <button type="button" className="link-btn" onClick={props.onResumeQueue}>
+                Send next now
+              </button>
+            )}
+          </p>
+          <ol>
+            {props.queued.map((m, i) => (
+              <li key={m.id}>
+                <span className="queue-text">{m.input.text}</span>
+                {m.input.images.length > 0 && <span className="meta">{m.input.images.length === 1 ? "1 image" : `${m.input.images.length} images`}</span>}
+                <button
+                  type="button"
+                  className="link-btn"
+                  aria-label={`Edit queued message ${i + 1}`}
+                  onClick={() => {
+                    props.onUnqueue?.(m.id);
+                    setText(m.input.text);
+                    setImages(m.input.images.map((img) => ({ ...img, url: `data:${img.mediaType};base64,${img.data}` })));
+                    setComputer(m.input.computerUse);
+                    setAllowFailing(m.input.allowFailingChecks);
+                    area.current?.focus();
+                  }}
+                >
+                  Edit
+                </button>
+                <button type="button" className="remove" aria-label={`Remove queued message ${i + 1}`} onClick={() => props.onUnqueue?.(m.id)}>
+                  <XIcon size={11} />
+                </button>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
       {images.length > 0 && (
         <ul className="attachments" aria-label="Attached images">
           {images.map((img, i) => (
@@ -133,7 +199,7 @@ export function Composer(props: ComposerProps) {
         rows={2}
         value={text}
         disabled={!!props.disabledReason}
-        placeholder={props.disabledReason ?? props.placeholder ?? "Ask Local Kovach to do something…"}
+        placeholder={props.disabledReason ?? (queues ? "Write the next message; it is sent when the current task finishes…" : (props.placeholder ?? "Ask Local Kovach to do something…"))}
         onChange={(e) => setText(e.target.value)}
         onPaste={(e: ClipboardEvent) => {
           const files = [...e.clipboardData.files].filter((f) => f.type.startsWith("image/"));
@@ -198,8 +264,19 @@ export function Composer(props: ComposerProps) {
           </label>
         </div>
         {props.running ? (
-          <button type="button" className="send stop" aria-label="Stop" onClick={props.onStop}>
-            <StopIcon />
+          <div className="send-group">
+            {queues && text.trim() && (
+              <button type="submit" className="send" aria-label="Queue message" title="Send when the current task finishes">
+                <ArrowUpIcon />
+              </button>
+            )}
+            <button type="button" className="send stop" aria-label="Stop" onClick={props.onStop}>
+              <StopIcon />
+            </button>
+          </div>
+        ) : queues ? (
+          <button type="submit" className="send" aria-label="Queue message" title="Send when the current task finishes" disabled={!!props.disabledReason || !text.trim()}>
+            <ArrowUpIcon />
           </button>
         ) : (
           <button type="submit" className="send" aria-label="Send" disabled={blocked || sending || !text.trim()}>

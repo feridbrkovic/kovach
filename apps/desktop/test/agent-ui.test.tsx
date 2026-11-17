@@ -153,9 +153,10 @@ describe("agent UI", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByRole("alertdialog");
 
+    // Another session's box stays open: what is written there waits for the running task.
     await user.click(screen.getByRole("button", { name: /^Invoice PDF/ }));
-    expect(await screen.findByPlaceholderText(/Another task is running in “Add cart badge to tab bar”/)).toBeTruthy();
-    expect(screen.getByLabelText("Message")).toHaveProperty("disabled", true);
+    expect(await screen.findByPlaceholderText(/sent when the current task finishes/)).toBeTruthy();
+    expect(screen.getByLabelText("Message")).toHaveProperty("disabled", false);
   });
 
   it("edits and tests the model settings", async () => {
@@ -274,5 +275,61 @@ describe("agent UI", () => {
     unmount();
     render(<ApprovalCard approval={{ ...base, kind: "command", command: "npx expo install expo-camera" }} onDecide={() => {}} />);
     expect(screen.getByRole("button", { name: "Allow this exact command for this session" })).toBeTruthy();
+  });
+});
+
+describe("queued messages", () => {
+  it("queues what is written while a task runs and sends it when the task finishes", async () => {
+    const started: string[] = [];
+    const demo = createDemoAgentApi({ stepMs: 0 });
+    const agent: AgentApi = { ...demo, start: async (input) => (started.push(input.text), demo.start(input)) };
+    const { user } = setup(agent);
+    await user.click(await screen.findByRole("button", { name: /^Add cart badge/ }));
+    await screen.findByRole("article");
+    await user.type(screen.getByLabelText("Message"), "Fix the cart total type error");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByRole("alertdialog");
+
+    // The task waits on an approval: the composer queues instead of refusing.
+    const box = screen.getByLabelText("Message");
+    expect((box as HTMLTextAreaElement).placeholder).toMatch(/sent when the current task finishes/);
+    await user.type(box, "Now add a test for it{Enter}");
+    await user.type(box, "And update the changelog{Enter}");
+    const queue = screen.getByRole("region", { name: "Queued messages" });
+    expect(within(queue).getAllByRole("listitem").map((li) => li.querySelector(".queue-text")?.textContent)).toEqual(["Now add a test for it", "And update the changelog"]);
+    expect(started).toEqual(["Fix the cart total type error"]);
+
+    // Remove one, then let the task finish: the other goes out by itself.
+    await user.click(within(queue).getByRole("button", { name: "Remove queued message 2" }));
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Allow once" }));
+    await waitFor(() => expect(started).toEqual(["Fix the cart total type error", "Now add a test for it"]));
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Queued messages" })).toBeNull());
+  });
+
+  it("holds the queue when the user stops the task, and sends on when told", async () => {
+    const started: string[] = [];
+    const demo = createDemoAgentApi({ stepMs: 0 });
+    const agent: AgentApi = { ...demo, start: async (input) => (started.push(input.text), demo.start(input)) };
+    const { user } = setup(agent);
+    await user.click(await screen.findByRole("button", { name: /^Add cart badge/ }));
+    await screen.findByRole("article");
+    await user.type(screen.getByLabelText("Message"), "Fix the cart total type error");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByRole("alertdialog");
+    await user.type(screen.getByLabelText("Message"), "Then add a test{Enter}");
+
+    // Edit pulls a queued message back into the box; sending it again queues it again.
+    const queue = screen.getByRole("region", { name: "Queued messages" });
+    await user.click(within(queue).getByRole("button", { name: "Edit queued message 1" }));
+    expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toBe("Then add a test");
+    await user.type(screen.getByLabelText("Message"), " for total(){Enter}");
+
+    await user.click(screen.getByRole("button", { name: "Stop" }));
+    const held = await screen.findByRole("region", { name: "Queued messages" });
+    await waitFor(() => expect(held.textContent).toMatch(/Waiting: the task was stopped\./));
+    expect(started).toEqual(["Fix the cart total type error"]);
+
+    await user.click(within(held).getByRole("button", { name: "Send next now" }));
+    await waitFor(() => expect(started).toEqual(["Fix the cart total type error", "Then add a test for total()"]));
   });
 });

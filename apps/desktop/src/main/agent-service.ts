@@ -642,9 +642,12 @@ export class AgentService implements Omit<AgentApi, "onStatus" | "onApproval" | 
             // a bookkeeping failure must never turn a finished task into an error
           }
         }
+        // The run is over before anyone hears it finished, so a queued message can start right away.
+        if (this.active?.runId === run.runId) this.active = undefined;
         status({ type: "finished", status: outcome.status, message: outcome.message });
       })
       .catch((err: unknown) => {
+        if (this.active?.runId === run.runId) this.active = undefined;
         status({ type: "finished", status: "error", message: err instanceof Error ? err.message : String(err) });
       })
       .finally(() => {

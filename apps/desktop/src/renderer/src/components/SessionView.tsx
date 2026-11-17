@@ -4,6 +4,7 @@ import type { AgentApi, ApprovalDecision, ApprovalPrompt, ProjectInfo, SessionFi
 import type { HistoryApi } from "../../../shared/ipc";
 import type { RunOutcome, RunState } from "../run-state";
 import { clockTime, relativeTime } from "../time";
+import type { QueuedMessage } from "../queue";
 import { Composer, type ComposerSubmit } from "./Composer";
 import { UsedMemories } from "./UsedMemories";
 import { FolderIcon } from "./icons";
@@ -30,6 +31,14 @@ export interface SessionViewProps {
     outcome: RunOutcome | undefined;
     /** Title of a session where another task is running. */
     busyElsewhere: string | undefined;
+    /** A task is running (here or elsewhere) or the queue is held: sending queues the message. */
+    queueing: boolean;
+    onQueue: (input: ComposerSubmit) => void;
+    queued: QueuedMessage[];
+    onUnqueue: (id: string) => void;
+    queuePaused: boolean;
+    queueError: string | undefined;
+    onResumeQueue: () => void;
     computerUse: boolean;
     onSend: (input: ComposerSubmit) => Promise<void>;
     onStop: () => void;
@@ -171,7 +180,8 @@ export function SessionView({ api, sessionId, revision, focusMessageId, now, age
   if (!session && !missing) return <div className="empty" aria-busy="true" />;
 
   const project = session?.projectId ? projects?.find((p) => p.id === session.projectId) : undefined;
-  const disabledReason = agent?.busyElsewhere ? `Another task is running in “${agent.busyElsewhere}”.` : undefined;
+  // Another session's task no longer blocks this one: what is written here waits in the queue.
+  const disabledReason = undefined;
 
   return (
     <article className="session" aria-labelledby="session-title">
@@ -239,6 +249,13 @@ export function SessionView({ api, sessionId, revision, focusMessageId, now, age
             running={!!runHere}
             onStop={agent.onStop}
             disabledReason={disabledReason}
+            queueing={agent.queueing}
+            onQueue={agent.onQueue}
+            queued={agent.queued}
+            onUnqueue={agent.onUnqueue}
+            queuePaused={agent.queuePaused}
+            queueError={agent.queueError}
+            onResumeQueue={agent.onResumeQueue}
             computerUse={agent.computerUse}
             placeholder={`Reply to “${untitled(session)}”…`}
             onSubmit={agent.onSend}

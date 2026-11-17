@@ -29,7 +29,11 @@ export function createDemoAgentApi(options: { stepMs?: number; projects?: Projec
   const pending = new Map<string, (d: ApprovalDecision) => void>();
   let seq = 0;
 
-  const emit = (e: AgentStatusEvent) => statusListeners.forEach((cb) => cb(e));
+  const emit = (e: AgentStatusEvent) => {
+    // As in the app: the run is over before anyone hears that it finished.
+    if (e.type === "finished" && active?.runId === e.runId) active = undefined;
+    statusListeners.forEach((cb) => cb(e));
+  };
   const wait = () => new Promise((r) => setTimeout(r, stepMs));
 
   async function play(run: RunRef & { stopped: boolean }, sessionId: string) {
