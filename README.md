@@ -1,4 +1,9 @@
-<h1 align="center">Local Kovach</h1>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/wordmark-dark.svg">
+    <img src="docs/assets/brand/wordmark-light.svg" alt="Local Kovach" height="64">
+  </picture>
+</p>
 
 <p align="center">
   A coding agent for macOS that runs entirely on your own machine<br>
@@ -14,6 +19,10 @@
 Local Kovach is a desktop app that plans a task, edits your project in small steps, runs your checks, reviews its own diff and only then says it is done. The model, your code, the conversation history and everything it learns stay on your Mac.
 
 The name comes from the Bosnian *kovač*, a smith: the one who forges and reshapes tools. "Local" because nothing leaves your machine.
+
+<p align="center">
+  <img src="docs/assets/readme/app-home.png" alt="Local Kovach: the start screen with the session history and the composer" width="900">
+</p>
 
 > **Status: early.** It is used daily by its author on one machine and is built from source. There is no signed release yet, and the interfaces still change. The design is in [MASTER_PLAN.md](MASTER_PLAN.md); progress is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -31,9 +40,17 @@ The name comes from the Bosnian *kovač*, a smith: the one who forges and reshap
 - **Every session**, searchable, resumable, and yours to rename or delete.
 - **Version-matched docs.** It indexes the official documentation for the library versions your project actually uses (React Native, Expo, React, Next.js, Node.js, TypeScript, Laravel, PHP, WordPress, WooCommerce and any npm library with docs in its repo).
 
+<p align="center">
+  <img src="docs/assets/readme/app-memory.png" alt="The Memory view: preferences, decisions, conventions and research, each with its scope and source" width="900">
+</p>
+
 ### Builds things that hold up
 - **Web pages and landing pages.** The model supplies the content; a page builder renders a full page in one of four design directions, with a logo mark, motion, form validation and search-engine tags. With web access on, it finds stock photos under public-domain or attribution licences and writes the credits. The page is then opened in a headless browser at phone and desktop widths, and measured problems go back to the model. Facts only the owner knows are left as `[placeholders]`, never invented.
 - **React Native apps.** A new app is created with Expo's own generator, then an app kit adds the architecture: one API client with zod validation, TanStack Query, design tokens, accessible UI primitives, a folder per feature with list and detail screens, optional sign-in with the token in secure storage, navigation and EAS build profiles. Playbooks cover React Native, native iOS and Android, and building, signing and store submission. It prepares a release; you publish it.
+
+| A page from the page builder | An app from the app kit |
+| --- | --- |
+| <img src="docs/assets/readme/result-page.png" alt="A generated bakery landing page with placeholders for the owner's facts" width="430"> | <img src="docs/assets/readme/result-app.png" alt="Generated app screens: bookings, a list of barbers, a detail screen and the account tab" width="430"> |
 
 ### Uses tools, with your say
 - **Terminal commands ask first.** "Allow for this session" covers commands of the same kind (`npx tsc …`) and says so on the button; anything that installs, deletes or publishes is asked about every time.
@@ -43,89 +60,16 @@ The name comes from the Bosnian *kovač*, a smith: the one who forges and reshap
 
 ## How it works
 
-One task, from request to answer:
+<p align="center">
+  <img src="docs/assets/readme/how-it-works.svg" alt="A task goes through four stages: understand, work, verify and, after the session, learn. A failing check or a review finding goes back to work; memory feeds the next task." width="900">
+</p>
 
-```mermaid
-flowchart TD
-    U(["Your request"]) --> CTX
+<p align="center">
+  <img src="docs/assets/readme/architecture.svg" alt="The desktop app holds the interface, the agent and the memory. The agent talks to a local model server and your project; memory uses SQLite. The web is reached only when you switch it on." width="900">
+</p>
 
-    subgraph S1["1 · Understand"]
-        CTX["Gather context<br/>project files · your rules · memory · docs for your versions"]
-        BRIEF["Brief and plan<br/>goal · deliverables · acceptance checks · steps"]
-        CTX --> BRIEF
-    end
-
-    subgraph S2["2 · Work in small steps"]
-        ACT["Model picks the next tool"]
-        NEED{"Needs your OK?"}
-        ASK["Approval card"]
-        RUN["Tool runs in your project"]
-        ACT --> NEED
-        NEED -- "read · search · edit" --> RUN
-        NEED -- "command · web · screen" --> ASK
-        ASK -- "allow" --> RUN
-        ASK -- "deny" --> ACT
-        RUN --> ACT
-    end
-
-    subgraph S3["3 · Verify"]
-        CHECKS{"Typecheck · lint · tests"}
-        FIX["The error, plus the fix<br/>that worked for it before"]
-        LOOK["Look: the page opened at<br/>phone and desktop width"]
-        REVIEW["Review: a fresh pass over<br/>task, diff and check results"]
-        CHECKS -- "fail" --> FIX
-        CHECKS -- "pass" --> LOOK
-        LOOK --> REVIEW
-    end
-
-    subgraph S4["4 · Learn, after the session"]
-        EXTRACT["Proposals from the session<br/>secret scan · evidence · scope · duplicates"]
-        INBOX["Review inbox<br/>you accept or reject"]
-        EPISODE["Fail, change, pass<br/>becomes a verified fix"]
-        MEM[("Memory")]
-        EXTRACT --> INBOX --> MEM
-        EPISODE --> MEM
-    end
-
-    BRIEF --> ACT
-    ACT -- "says it is done" --> CHECKS
-    FIX --> ACT
-    LOOK -- "measured problems" --> ACT
-    REVIEW -- "must-fix findings, once" --> ACT
-    REVIEW -- "clean" --> ANSWER(["Answer"])
-    ANSWER --> EXTRACT
-    CHECKS -. "failed, then passed" .-> EPISODE
-    MEM -. "next task" .-> CTX
-```
-
-What runs where:
-
-```mermaid
-flowchart LR
-    subgraph APP["Local Kovach (Electron)"]
-        UI["Renderer · React<br/>transcript · approvals · memory views"]
-        MAIN["Main process<br/>runs · approvals · headless page checks"]
-        AGENT["packages/agent<br/>loop · tools · playbooks<br/>page builder · app kit"]
-        MEMS["packages/memory-service<br/>history · memories · docs packs<br/>fixes · extraction"]
-        UI <-- "IPC, typed by memory-contract" --> MAIN
-        MAIN --> AGENT
-        MAIN --> MEMS
-        AGENT -- "search_memory · search_docs" --> MEMS
-    end
-
-    MODEL["Model server on 127.0.0.1<br/>Qwen3.6-35B-A3B · embeddinggemma"]
-    DB[("SQLite<br/>FTS5 + sqlite-vec")]
-    PROJECT["Your project folder"]
-    WEB["SearXNG · web pages · stock photos"]
-
-    AGENT -- "chat and tool calls" --> MODEL
-    MEMS -- "embeddings" --> MODEL
-    MEMS --> DB
-    AGENT -- "files and commands" --> PROJECT
-    AGENT -. "only when you switch it on" .-> WEB
-```
-
-The specifics:
+<details>
+<summary><b>The specifics, stage by stage</b></summary>
 
 | Stage | What happens |
 | --- | --- |
@@ -137,6 +81,8 @@ The specifics:
 | Approvals | Commands, web access, screen control and image generation ask first. Memory saves are asked about one by one, always. |
 | Verify | Checks come from the project (typecheck, lint, tests). The review is a separate pass that sees only the task, the diff and the results, answers in strict JSON, and can send the work back once. |
 | Learn | When a session is finished or idle for ten minutes, at most five proposals are extracted, each with the message it rests on. A fix is kept only when the same check failed, files changed, and it passed in one session. |
+
+</details>
 
 ## What stays on your machine
 
