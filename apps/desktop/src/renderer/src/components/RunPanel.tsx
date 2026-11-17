@@ -48,7 +48,12 @@ export function LiveRun({ run, startedAt }: { run: RunState; startedAt: number }
 
 export function ApprovalCard({ approval, onDecide }: { approval: ApprovalPrompt; onDecide: (d: ApprovalDecision) => void }) {
   const Icon = approval.kind === "computer" ? CursorIcon : approval.kind === "web" ? GlobeIcon : approval.kind === "media" ? ImageIcon : approval.kind === "memory" ? MemoryIcon : TerminalIcon;
-  const sessionLabel = approval.kind === "command" || approval.kind === "check" ? "Allow for this session" : "Allow all like this for this session";
+  const sessionLabel =
+    approval.kind === "command" || approval.kind === "check"
+      ? approval.sessionScope
+        ? `Allow ${approval.sessionScope} for this session`
+        : "Allow this exact command for this session"
+      : "Allow all like this for this session";
   return (
     <div className="approval" role="alertdialog" aria-labelledby="approval-title" aria-describedby="approval-command">
       <h2 id="approval-title">{APPROVAL_TITLE[approval.kind]}</h2>

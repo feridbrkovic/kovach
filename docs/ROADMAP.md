@@ -87,7 +87,7 @@ Working checklist for [MASTER_PLAN.md](../MASTER_PLAN.md). Tick items as they la
   - [ ] Visual check for Expo apps (web export, screenshots of each tab) so the agent sees its screens as it does web pages
   - [ ] App kit: forms, pagination, an action on the detail screen, tests (jest-expo)
   - [ ] Generated pages: fonts stored with the page instead of loaded from Google
-  - [ ] "Allow for this session" should cover the session, not one command
+  - [x] "Allow for this session" covers commands of the same kind (`npx tsc …`, `npm run test …`), shown on the button; commands that add code, delete, publish or lean on the shell are still remembered exactly
   - [ ] Move the web and mobile start-up steps out of `loop.ts` into one recipe interface
   - [ ] End-to-end task eval set (a few real tasks scored against their briefs)
   - [x] Self-review before finishing: a fresh-context pass over only the task, the diff of what the run changed (tracked per file) and the check results; strict JSON findings, greedy sampling; must-fix findings go back to the agent once to fix or justify, suggestions are only shown; a failing reviewer never holds the run up. Shown as a "Review" step. Loop notes (failing checks, review findings) are no longer stored as the user's words

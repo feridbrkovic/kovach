@@ -26,6 +26,7 @@ import {
   webTools,
 } from "@kovach-dev/agent";
 import { MemoryApiError } from "@kovach-dev/memory-contract";
+import { commandAllowed, commandScopes, rememberCommand, scopeLabel } from "./command-scope";
 import { type AlwaysOnBlock, type ContextItem, type HistoryStore, type MemoryStore, redactSecrets, scanSecrets } from "@kovach-dev/memory-service";
 import {
   type AgentApi,
@@ -672,8 +673,10 @@ export class AgentService implements Omit<AgentApi, "onStatus" | "onApproval" | 
     // model read later (a web page, a file) plant lasting "preferences".
     if (decision === "allow_session" && p.kind !== "memory") {
       const set = this.remembered.get(p.sessionId) ?? new Set<string>();
-      // Commands are remembered exactly; screen, web and media actions by kind (every click differs).
-      set.add(p.kind === "command" || p.kind === "check" ? p.command : `kind:${p.kind}`);
+      // Commands are remembered by what they do (see command-scope.ts), or exactly when that
+      // can't be told safely; screen, web and media actions by kind (every click differs).
+      if (p.kind === "command" || p.kind === "check") rememberCommand(set, p.command);
+      else set.add(`kind:${p.kind}`);
       this.remembered.set(p.sessionId, set);
     }
     p.resolve(decision !== "deny");
@@ -843,11 +846,21 @@ export class AgentService implements Omit<AgentApi, "onStatus" | "onApproval" | 
   private ask(run: ActiveRun, req: ApprovalRequest): Promise<boolean> {
     if (run.controller.signal.aborted) return Promise.resolve(false);
     const allowed = this.remembered.get(run.sessionId);
-    if (allowed?.has(req.kind === "command" || req.kind === "check" ? req.command : `kind:${req.kind}`)) return Promise.resolve(true);
+    const isCommand = req.kind === "command" || req.kind === "check";
+    if (isCommand ? commandAllowed(allowed, req.command) : allowed?.has(`kind:${req.kind}`)) return Promise.resolve(true);
     const requestId = randomUUID();
+    const scopes = isCommand ? commandScopes(req.command) : undefined;
     return new Promise((resolve) => {
       this.pending.set(requestId, { sessionId: run.sessionId, command: req.command, kind: req.kind, resolve });
-      this.deps.send.approval({ runId: run.runId, sessionId: run.sessionId, requestId, kind: req.kind, command: req.command, cwd: req.cwd });
+      this.deps.send.approval({
+        runId: run.runId,
+        sessionId: run.sessionId,
+        requestId,
+        kind: req.kind,
+        command: req.command,
+        cwd: req.cwd,
+        ...(scopes ? { sessionScope: scopeLabel(scopes) } : {}),
+      });
     });
   }
 

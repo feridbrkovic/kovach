@@ -5,6 +5,7 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "../src/renderer/src/App";
+import { ApprovalCard } from "../src/renderer/src/components/RunPanel";
 import { createDemoAgentApi } from "../src/renderer/src/demo-agent";
 import type { AgentApi, AgentStatusEvent } from "../src/shared/agent";
 
@@ -265,5 +266,13 @@ describe("agent UI", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect((await screen.findByRole("alert")).textContent).toMatch(/Was it moved/);
     expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toBe("Go");
+  });
+  it("says on the button what a session-wide yes covers", () => {
+    const base = { runId: "r", sessionId: "s", requestId: "q", cwd: "/tmp/app" };
+    const { unmount } = render(<ApprovalCard approval={{ ...base, kind: "command", command: "npx tsc --noEmit", sessionScope: "npx tsc …" }} onDecide={() => {}} />);
+    expect(screen.getByRole("button", { name: "Allow npx tsc … for this session" })).toBeTruthy();
+    unmount();
+    render(<ApprovalCard approval={{ ...base, kind: "command", command: "npx expo install expo-camera" }} onDecide={() => {}} />);
+    expect(screen.getByRole("button", { name: "Allow this exact command for this session" })).toBeTruthy();
   });
 });

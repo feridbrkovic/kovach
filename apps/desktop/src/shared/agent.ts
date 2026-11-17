@@ -108,6 +108,8 @@ export interface ApprovalPrompt {
   kind: "command" | "check" | "computer" | "web" | "media" | "memory";
   command: string;
   cwd: string;
+  /** For commands: what a session-wide yes would cover, e.g. "npx expo lint …". Absent when only this exact command would be remembered. */
+  sessionScope?: string;
 }
 
 export interface PlanStep {

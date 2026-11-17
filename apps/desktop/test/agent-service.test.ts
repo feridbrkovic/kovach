@@ -226,7 +226,7 @@ describe("runs", () => {
 
     // The check asks for approval; allow it for the rest of the session.
     await vi.waitFor(() => expect(approvals).toHaveLength(1));
-    expect(approvals[0]).toMatchObject({ kind: "check", command: "npm run typecheck", sessionId: ref.sessionId });
+    expect(approvals[0]).toMatchObject({ kind: "check", command: "npm run typecheck", sessionId: ref.sessionId, sessionScope: "npm run typecheck …" });
     await svc.respond(approvals[0]!.requestId, "allow_session");
 
     const f = await finished();
