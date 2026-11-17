@@ -17,12 +17,13 @@ import {
 } from "@kovach-dev/memory-service";
 import { createMacDriver, hasCliclick, webFetch } from "@kovach-dev/agent";
 import { lookAtPage, measureReference } from "./page-look";
-import { app, BrowserWindow, desktopCapturer, dialog, ipcMain, Menu, nativeImage, type MenuItemConstructorOptions, safeStorage, shell, systemPreferences } from "electron";
+import { app, BrowserWindow, desktopCapturer, dialog, ipcMain, Menu, nativeImage, Notification, type MenuItemConstructorOptions, safeStorage, shell, systemPreferences } from "electron";
 import { CHANNELS } from "../shared/ipc";
 import { serveAgent } from "./agent-ipc";
 import { AgentService, type ComputerHost, createFileSettingsStore, type MediaHost } from "./agent-service";
 import { createFixSummarizer, createMemoryExtractor, settingsModel } from "./fix-summarizer";
 import { createMfluxProvider, installMedia, mediaStatus } from "./media";
+import { AutomationRunner, createAutomationStore } from "./automations";
 import { formatBytes, freeScratchSpace, removeScratch, scratchUsage } from "./scratch-space";
 import { loadLoginShellPath } from "./shell-path";
 import { getLoadablePath } from "sqlite-vec";
@@ -41,6 +42,7 @@ app.setPath("userData", join(app.getPath("appData"), APP_NAME));
 let db: Db | undefined;
 let stopServing: (() => void) | undefined;
 let agent: AgentService | undefined;
+let automations: AutomationRunner | undefined;
 let memoryStore: MemoryStore | undefined;
 let fixSummarizer: Summarizer | undefined;
 let memoryExtractor: Extractor | undefined;
@@ -214,8 +216,14 @@ function openMemory(): void {
     onSettingsChanged: () => void refreshEmbedder(),
     settings: settingsStore,
     send: {
-      status: (e) => broadcast(CHANNELS.agentStatus, e),
-      approval: (p) => broadcast(CHANNELS.agentApproval, p),
+      status: (e) => {
+        broadcast(CHANNELS.agentStatus, e);
+        automations?.onStatus(e);
+      },
+      approval: (p) => {
+        broadcast(CHANNELS.agentApproval, p);
+        automations?.onApproval(p);
+      },
       media: (line) => broadcast(CHANNELS.agentMedia, line),
     },
     scratchDir: join(dataDir, "scratch"),
@@ -253,6 +261,35 @@ function openMemory(): void {
       return result.canceled ? undefined : result.filePaths[0];
     },
   });
+  // Scheduled automations: checked every half minute while the app runs.
+  const service = agent;
+  automations = new AutomationRunner({
+    store: createAutomationStore(join(dataDir, "automations.json")),
+    host: {
+      start: (input) => service.start(input),
+      stop: (runId) => service.stop(runId),
+      activeRun: () => service.activeRun(),
+      projectExists: (id) => !!history.getProject(id),
+    },
+    notify: (title, body, sessionId) => {
+      if (!Notification.isSupported()) return;
+      const note = new Notification({ title, body, silent: false });
+      note.on("click", () => {
+        const win = BrowserWindow.getAllWindows()[0];
+        if (!win) return;
+        if (win.isMinimized()) win.restore();
+        win.show();
+        win.focus();
+        if (sessionId) win.webContents.send(CHANNELS.openSession, sessionId);
+      });
+      note.show();
+    },
+  });
+  agent.attachAutomations(automations);
+  setTimeout(() => void automations?.tick(), 15_000);
+  setInterval(() => void automations?.tick(), 30_000);
+  installMenu();
+
   const stopAgent = serveAgent(ipcMain, agent);
   stopServing = () => {
     stopHistory();
@@ -351,7 +388,21 @@ function installMenu(): void {
   const root = app.isPackaged ? undefined : evalsRoot(app.getAppPath());
   const template: MenuItemConstructorOptions[] = [
     { role: "appMenu" },
-    { label: "File", submenu: [{ label: "Free Up Space…", click: () => void freeUpSpaceFromMenu() }, { type: "separator" }, { role: "close" }] },
+    {
+      label: "File",
+      submenu: [
+        { label: "Free Up Space…", click: () => void freeUpSpaceFromMenu() },
+        {
+          label: "Pause All Automations",
+          type: "checkbox",
+          checked: automations?.list().paused ?? false,
+          enabled: !!automations,
+          click: (item) => automations?.setPaused(item.checked),
+        },
+        { type: "separator" },
+        { role: "close" },
+      ],
+    },
     { role: "editMenu" },
     { role: "viewMenu" },
     { role: "windowMenu" },

@@ -21,6 +21,7 @@ const bridge: KovachBridge = {
     onStatus: (cb) => subscribe<AgentStatusEvent>(CHANNELS.agentStatus, cb),
     onApproval: (cb) => subscribe<ApprovalPrompt>(CHANNELS.agentApproval, cb),
     onMediaProgress: (cb) => subscribe<string>(CHANNELS.agentMedia, cb),
+    onOpenSession: (cb) => subscribe<string>(CHANNELS.openSession, cb),
   },
 };
 

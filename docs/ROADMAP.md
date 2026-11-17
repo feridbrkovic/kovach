@@ -140,6 +140,8 @@ Built and tested ahead of their phases so the app is useful now:
   - [ ] Standards review before "done": linters, `axe-core`, Lighthouse, screenshot design review; quality report
   - [ ] UI: Knowledge view (projects, packs, injection preview)
   - **Exit gate:** recall@6 ≥ 80% on "how did I do X" questions; clear rubric gain on 30 blind-graded tasks; ≤ 15% slower; no secrets indexed.
+- [x] **Scheduled automations (first part of Phase 7)**: name, what to do, project, schedule (days and time, every few hours, once; typed in English or Bosnian words), a trial run first that only looks, runs one at a time as ordinary sessions, missed runs collapse into one, 20-minute budget, notifications that open the session, Pause all in the view and the File menu. Runs while the app is open
+- [ ] **Phase 7 — Connectors & automations** (rest): event triggers, launchd so runs happen with the app closed, open at login, approval inbox, connectors
 - [ ] **Phase 7 — Connectors & automations** (~2.5–3 weeks): MCP client, curated connectors, Gmail (personal OAuth client), automation engine, launchd scheduling, approval inbox
 - [ ] **Phase 8 — Image & video generation** (~1.5 weeks, optional): media worker, Z-Image-Turbo, Wan 2.2 / LTX-2.3
 - [ ] Desktop computer use (level 3, opt-in): Qwen planner + UI-Venus-1.5-8B grounder

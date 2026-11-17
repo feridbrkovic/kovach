@@ -72,9 +72,15 @@ export function createIpcAgentApi(bridge: KovachBridge["agent"]): AgentApi {
     mediaStatus: () => call("mediaStatus"),
     installMedia: () => call("installMedia"),
     readAttachment: (name) => call("readAttachment", [name]),
+    listAutomations: () => call("listAutomations"),
+    saveAutomation: (input) => call("saveAutomation", [input]),
+    deleteAutomation: (id) => call("deleteAutomation", [id]),
+    runAutomation: (id, options) => call("runAutomation", [id, options ?? {}]),
+    setAutomationsPaused: (paused) => call("setAutomationsPaused", [paused]),
     onStatus: (cb) => bridge.onStatus(cb),
     onApproval: (cb) => bridge.onApproval(cb),
     onMediaProgress: (cb) => bridge.onMediaProgress(cb),
+    onOpenSession: (cb) => bridge.onOpenSession(cb),
   };
 }
 

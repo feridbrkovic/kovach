@@ -5,11 +5,14 @@ import {
   type AgentStatusEvent,
   type ApprovalDecision,
   type ApprovalPrompt,
+  type Automation,
+  type AutomationsView,
   DEFAULT_SETTINGS,
   type ProjectInfo,
   type RunRef,
   type StatusBody,
 } from "../../shared/agent";
+import { nextRunAt } from "../../shared/schedule";
 
 /**
  * A pretend agent for the browser preview and UI tests: it walks through a
@@ -25,6 +28,7 @@ export function createDemoAgentApi(options: { stepMs?: number; projects?: Projec
   ];
   const statusListeners = new Set<(e: AgentStatusEvent) => void>();
   const approvalListeners = new Set<(p: ApprovalPrompt) => void>();
+  let automations: AutomationsView = { paused: false, items: [] };
   let active: (RunRef & { stopped: boolean }) | undefined;
   const pending = new Map<string, (d: ApprovalDecision) => void>();
   let seq = 0;
@@ -92,6 +96,41 @@ export function createDemoAgentApi(options: { stepMs?: number; projects?: Projec
     showSessionFiles: async () => undefined,
     openSessionPage: async () => undefined,
     saveSessionFiles: async () => undefined,
+    onOpenSession: () => () => undefined,
+    listAutomations: async () => structuredClone(automations),
+    async saveAutomation(input) {
+      const at = Date.now();
+      const existing = automations.items.find((a) => a.id === input.id);
+      const saved: Automation = {
+        id: existing?.id ?? `aut_demo_${++seq}`,
+        name: input.name,
+        prompt: input.prompt,
+        ...(input.projectId ? { projectId: input.projectId } : {}),
+        schedule: input.schedule,
+        enabled: input.enabled ?? true,
+        dryRunDone: existing?.dryRunDone ?? false,
+        createdAt: existing?.createdAt ?? at,
+        updatedAt: at,
+      };
+      const next = saved.enabled ? nextRunAt(saved.schedule, at) : undefined;
+      if (next !== undefined) saved.nextRunAt = next;
+      automations.items = existing ? automations.items.map((a) => (a.id === saved.id ? saved : a)) : [...automations.items, saved];
+      return structuredClone(saved);
+    },
+    async deleteAutomation(id) {
+      automations.items = automations.items.filter((a) => a.id !== id);
+    },
+    async runAutomation(id, options) {
+      const a = automations.items.find((x) => x.id === id);
+      if (!a) throw new MemoryApiError("not_found", "That automation no longer exists");
+      const ref = await this.start({ text: a.prompt, ...(a.projectId ? { projectId: a.projectId } : {}) });
+      a.lastRun = { at: Date.now(), sessionId: ref.sessionId, dryRun: options?.dryRun ?? !a.dryRunDone, status: "running" };
+      return ref;
+    },
+    async setAutomationsPaused(paused) {
+      automations.paused = paused;
+      return structuredClone(automations);
+    },
     activeRun: async () => (active ? { runId: active.runId, sessionId: active.sessionId } : undefined),
     async start(input) {
       if (!input.text.trim()) throw new MemoryApiError("invalid", "Write what you want done first");

@@ -1,3 +1,4 @@
+import type { Schedule } from "./schedule";
 /** Types shared by the main process and the renderer for running the agent. */
 
 export interface AgentSettings {
@@ -81,6 +82,43 @@ export interface StartInput {
   computerUse?: boolean;
   /** The user's override: allow finishing while checks are red. */
   allowFailingChecks?: boolean;
+  /** Title for a new session (automations name theirs). */
+  title?: string;
+  /** Look and report only: tools that change files or run commands are left out. */
+  readOnly?: boolean;
+}
+
+/** A task that starts by itself on a schedule. Every run is an ordinary session in the history. */
+export interface Automation {
+  id: string;
+  name: string;
+  /** What to do, as the user would write it in the message box. */
+  prompt: string;
+  /** Runs in this project, or without one (a private scratch folder per run). */
+  projectId?: string;
+  schedule: Schedule;
+  enabled: boolean;
+  /** The first run only looks and reports what it would do; real runs start after it. */
+  dryRunDone: boolean;
+  createdAt: number;
+  updatedAt: number;
+  nextRunAt?: number;
+  lastRun?: { at: number; sessionId: string; dryRun: boolean; status: RunFinalStatus | "running"; message?: string };
+}
+
+export interface AutomationInput {
+  id?: string;
+  name: string;
+  prompt: string;
+  projectId?: string;
+  schedule: Schedule;
+  enabled?: boolean;
+}
+
+export interface AutomationsView {
+  /** The kill switch: no automation starts while this is on. */
+  paused: boolean;
+  items: Automation[];
 }
 
 export interface ComputerPermissions {
@@ -180,9 +218,22 @@ export interface AgentApi {
   onApproval(cb: (p: ApprovalPrompt) => void): () => void;
   /** Output lines while the image module installs. */
   onMediaProgress(cb: (line: string) => void): () => void;
+  /** The app asks to show a session (a notification was clicked). */
+  onOpenSession(cb: (sessionId: string) => void): () => void;
+  listAutomations(): Promise<AutomationsView>;
+  saveAutomation(input: AutomationInput): Promise<Automation>;
+  deleteAutomation(id: string): Promise<void>;
+  /** Start one now; a dry run only looks and reports. */
+  runAutomation(id: string, options?: { dryRun?: boolean }): Promise<RunRef>;
+  setAutomationsPaused(paused: boolean): Promise<AutomationsView>;
 }
 
 export const AGENT_METHODS = [
+  "listAutomations",
+  "saveAutomation",
+  "deleteAutomation",
+  "runAutomation",
+  "setAutomationsPaused",
   "getSettings",
   "saveSettings",
   "checkModel",

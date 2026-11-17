@@ -2,7 +2,7 @@ import type { MessageHit, SessionSummary } from "@kovach-dev/memory-contract";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import type { DataSource } from "../api";
 import { type DayGroup, dayGroup, relativeTime } from "../time";
-import { GearIcon, Mark, MemoryIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from "./icons";
+import { ClockIcon, GearIcon, Mark, MemoryIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from "./icons";
 
 export interface SidebarProps {
   sessions: SessionSummary[];
@@ -29,6 +29,8 @@ export interface SidebarProps {
   /** Opens the memory browser. */
   onOpenMemory?: () => void;
   memoryActive?: boolean;
+  onOpenAutomations?: () => void;
+  automationsActive?: boolean;
 }
 
 const GROUPS: DayGroup[] = ["Today", "Yesterday", "Previous 7 days", "Older"];
@@ -137,6 +139,18 @@ export function Sidebar(props: SidebarProps) {
               onClick={props.onOpenMemory}
             >
               <MemoryIcon /> <span aria-hidden="true">Memory</span>
+            </button>
+          )}
+          {props.onOpenAutomations && (
+            <button
+              type="button"
+              className={`footer-btn${props.automationsActive ? " active" : ""}`}
+              aria-label="Automations"
+              title="Tasks that start by themselves"
+              aria-current={props.automationsActive ? "page" : undefined}
+              onClick={props.onOpenAutomations}
+            >
+              <ClockIcon size={15} />
             </button>
           )}
           {props.onOpenSettings && (

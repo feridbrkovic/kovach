@@ -47,6 +47,8 @@ export const CHANNELS = {
   agentStatus: "kovach:agent:status",
   agentApproval: "kovach:agent:approval",
   agentMedia: "kovach:agent:media",
+  /** Main asks the window to open a session (a clicked notification). */
+  openSession: "kovach:open-session",
 } as const;
 
 /**
@@ -66,6 +68,7 @@ export interface KovachBridge {
     onStatus(cb: (e: AgentStatusEvent) => void): () => void;
     onApproval(cb: (p: ApprovalPrompt) => void): () => void;
     onMediaProgress(cb: (line: string) => void): () => void;
+    onOpenSession(cb: (sessionId: string) => void): () => void;
   };
 }
 

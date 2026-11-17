@@ -333,3 +333,33 @@ describe("queued messages", () => {
     await waitFor(() => expect(started).toEqual(["Fix the cart total type error", "Then add a test for total()"]));
   });
 });
+
+describe("automations", () => {
+  it("creates one from plain words, lists it, and starts its trial run", async () => {
+    const started: string[] = [];
+    const demo = createDemoAgentApi({ stepMs: 0 });
+    const agent: AgentApi = { ...demo, start: async (input) => (started.push(input.text), demo.start(input)) };
+    const { user } = setup(agent);
+    await user.click(await screen.findByRole("button", { name: "Automations" }));
+    expect(await screen.findByText("Nothing scheduled yet")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "New automation" }));
+    const form = screen.getByRole("form", { name: "New automation" });
+    await user.type(within(form).getByLabelText("Name"), "Morning tests");
+    await user.type(within(form).getByLabelText("What to do"), "Run the tests and summarise what fails");
+    await user.type(within(form).getByLabelText("When, in words"), "radnim danima u 9");
+    expect(within(form).getByRole("status").textContent).toBe("Understood: Weekdays at 09:00");
+    expect((within(form).getByLabelText("Time") as HTMLInputElement).value).toBe("09:00");
+    expect(within(form).getByRole("button", { name: "Saturday" }).getAttribute("aria-pressed")).toBe("false");
+    await user.click(within(form).getByRole("button", { name: "Create" }));
+
+    const list = await screen.findByRole("list", { name: "Automations" });
+    const item = within(list).getByRole("listitem");
+    expect(item.textContent).toMatch(/Morning tests/);
+    expect(item.textContent).toMatch(/Weekdays at 09:00 · No project · trial run first/);
+    expect(item.textContent).toMatch(/Next: /);
+
+    await user.click(within(item).getByRole("button", { name: /Try it/ }));
+    await waitFor(() => expect(started).toEqual(["Run the tests and summarise what fails"]));
+  });
+});

@@ -2340,3 +2340,221 @@ dd .evidence {
 .link-btn:hover {
   text-decoration: underline;
 }
+
+/* -------------------------------------------------------------- automations */
+
+.automation-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: none;
+}
+.automations .banner {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ember) 12%, transparent);
+  font-size: 13px;
+}
+.automations .empty-state {
+  padding: 40px 0;
+  text-align: center;
+}
+.automations .empty-state h2 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+.automation-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.automation {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.automation.off {
+  opacity: 0.6;
+}
+.automation-main {
+  flex: 1;
+  min-width: 0;
+}
+.automation-main h3 {
+  margin: 0 0 2px;
+  font-size: 14.5px;
+}
+.automation-main .meta {
+  margin: 2px 0;
+}
+.automation-prompt {
+  margin: 8px 0;
+  font-size: 13.5px;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.automation-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+.link-btn.danger {
+  color: var(--danger);
+}
+.link-btn:disabled {
+  color: var(--muted);
+  cursor: default;
+  text-decoration: none;
+}
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 20px;
+}
+.switch input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.switch span {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--line);
+  transition: background 0.15s;
+  pointer-events: none;
+}
+.switch span::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+  transition: transform 0.15s;
+}
+.switch input:checked + span {
+  background: var(--ember);
+}
+.switch input:checked + span::after {
+  transform: translateX(14px);
+}
+.switch input:focus-visible + span {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.automation-editor {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.automation-editor > label,
+.automation-editor .when {
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.automation-editor input,
+.automation-editor textarea,
+.automation-editor select {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+.automation-editor .when {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+.automation-editor legend {
+  padding: 0;
+  margin-bottom: 6px;
+}
+.when-kind,
+.when-row,
+.days {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.when-row {
+  gap: 12px;
+  color: var(--text);
+}
+.when-row input[type="number"] {
+  width: 70px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--text);
+  cursor: pointer;
+}
+.chip input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.chip.on {
+  border-color: var(--ember);
+  background: color-mix(in srgb, var(--ember) 12%, transparent);
+}
+.chip:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.day {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font-size: 12.5px;
+}
+.day.on {
+  background: var(--ember);
+  border-color: var(--ember);
+  color: #fff;
+}
+.editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.when-words input {
+  width: 100%;
+  box-sizing: border-box;
+}

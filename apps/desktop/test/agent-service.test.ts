@@ -861,3 +861,41 @@ describe("helpers", () => {
     expect(describeActivity("mystery", {})).toBe("Using mystery");
   });
 });
+
+describe("follow-up messages", () => {
+  it("lets a follow-up replace what earlier messages of the session made, in a scratch session and in a project", async () => {
+    // Scratch session: the page from the first message is the session's own.
+    const scratch = service(
+      scripted([call("create_file", { path: "index.html", content: "<h1>v1</h1>\n" }), say("Made the page."), call("create_file", { path: "index.html", content: "<h1>v2</h1>\n" }), say("Rebuilt the page.")]),
+      { runOptions: { plan: false, review: false } },
+    );
+    const ref = await scratch.start({ text: "Make a page for my bakery" });
+    expect((await finished()).status).toBe("done");
+    statuses.length = 0;
+    await scratch.start({ sessionId: ref.sessionId, text: "Make it bolder" });
+    expect(await finished()).toMatchObject({ status: "done", message: "Rebuilt the page." });
+    expect(readFileSync(join(root, "data", "scratch", ref.sessionId, "index.html"), "utf8")).toBe("<h1>v2</h1>\n");
+
+    // Project session: only files the session created count, not the project's own.
+    statuses.length = 0;
+    writeFileSync(join(project, "package.json"), "{}"); // no checks to approve in this test
+    const svc = service(
+      scripted([
+        call("create_file", { path: "src/badge.js", content: "export const badge = 1;\n" }),
+        say("Added the badge."),
+        call("create_file", { path: "src/badge.js", content: "export const badge = 2;\n" }),
+        call("create_file", { path: "src/cart.js", content: "// replaced\n" }),
+        say("Updated the badge."),
+      ]),
+      { runOptions: { plan: false, review: false } },
+    );
+    const p = (await svc.addProject())!;
+    const first = await svc.start({ projectId: p.id, text: "Add a badge module" });
+    await finished();
+    statuses.length = 0;
+    await svc.start({ sessionId: first.sessionId, text: "Make the badge 2" });
+    await finished();
+    expect(readFileSync(join(project, "src/badge.js"), "utf8")).toBe("export const badge = 2;\n");
+    expect(readFileSync(join(project, "src/cart.js"), "utf8")).toBe(CART);
+  });
+});

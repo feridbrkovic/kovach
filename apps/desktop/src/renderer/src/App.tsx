@@ -6,6 +6,7 @@ import type { DataSource } from "./api";
 import { Composer, type ComposerSubmit } from "./components/Composer";
 import { Mark } from "./components/icons";
 import { AttachmentContext } from "./components/Markdown";
+import { AutomationsView } from "./components/AutomationsView";
 import { type MemoryFocus, MemoryView } from "./components/MemoryView";
 import { SessionView } from "./components/SessionView";
 import { SettingsDialog } from "./components/SettingsDialog";
@@ -34,7 +35,7 @@ export function App({ api, agent, source, now = Date.now, searchDelay = 200 }: A
   const [hits, setHits] = useState<MessageHit[] | null>(null);
   const [searching, setSearching] = useState(false);
 
-  const [view, setView] = useState<"session" | "new" | "memory">(agent ? "new" : "session");
+  const [view, setView] = useState<"session" | "new" | "memory" | "automations">(agent ? "new" : "session");
   const [memoryFocus, setMemoryFocus] = useState<MemoryFocus | undefined>();
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [focusMessageId, setFocusMessageId] = useState<string | undefined>();
@@ -114,9 +115,16 @@ export function App({ api, agent, source, now = Date.now, searchDelay = 200 }: A
       }
     });
     const offApproval = agent.onApproval(setApproval);
+    // A clicked notification (an automation finished or needs an OK) opens its session.
+    const offOpen = agent.onOpenSession((id) => {
+      setView("session");
+      setSelectedId(id);
+      setFocusMessageId(undefined);
+    });
     return () => {
       offStatus();
       offApproval();
+      offOpen();
     };
   }, [agent]);
 
@@ -270,6 +278,7 @@ export function App({ api, agent, source, now = Date.now, searchDelay = 200 }: A
         now={now}
         onOpenMemory={() => openMemory()}
         memoryActive={view === "memory"}
+        {...(agent ? { onOpenAutomations: () => setView("automations"), automationsActive: view === "automations" } : {})}
         {...(agent
           ? {
               onNewSession: () => setView("new"),
@@ -280,7 +289,9 @@ export function App({ api, agent, source, now = Date.now, searchDelay = 200 }: A
           : {})}
       />
       <main className="main">
-        {view === "memory" ? (
+        {view === "automations" && agent ? (
+          <AutomationsView agent={agent} projects={projects} now={now} busy={!!run} onOpenSession={(id) => select(id)} />
+        ) : view === "memory" ? (
           <MemoryView api={api} projects={projects} now={now} focus={memoryFocus} searchDelay={searchDelay} onOpenSession={select} />
         ) : view === "new" && agent ? (
           <section className="start" aria-label="New session">

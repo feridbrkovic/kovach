@@ -28,6 +28,7 @@ import {
   webTools,
 } from "@kovach-dev/agent";
 import { MemoryApiError } from "@kovach-dev/memory-contract";
+import type { AutomationRunner } from "./automations";
 import { commandAllowed, commandScopes, rememberCommand, scopeLabel } from "./command-scope";
 import { type AlwaysOnBlock, type ContextItem, type HistoryStore, type MemoryStore, redactSecrets, scanSecrets } from "@kovach-dev/memory-service";
 import {
@@ -52,6 +53,9 @@ import {
   type StoredSettings,
   type StartInput,
   type StatusBody,
+  type Automation,
+  type AutomationInput,
+  type AutomationsView,
 } from "../shared/agent";
 
 export interface SettingsStore {
@@ -262,7 +266,7 @@ const RESUME_MESSAGES = 20;
  * every command approved through the renderer, everything recorded in history.
  * Electron-free, so it is tested directly.
  */
-export class AgentService implements Omit<AgentApi, "onStatus" | "onApproval" | "onMediaProgress"> {
+export class AgentService implements Omit<AgentApi, "onStatus" | "onApproval" | "onMediaProgress" | "onOpenSession"> {
   private active: ActiveRun | undefined;
   private installing = false;
   private pending = new Map<string, { sessionId: string; command: string; kind: ApprovalRequest["kind"]; resolve: (ok: boolean) => void }>();
@@ -472,6 +476,54 @@ export class AgentService implements Omit<AgentApi, "onStatus" | "onApproval" | 
     this.extractionTimers.delete(sessionId);
   }
 
+  /** Scheduled automations; attached once the app has built the runner (it needs this service). */
+  private automations: AutomationRunner | undefined;
+  attachAutomations(runner: AutomationRunner): void {
+    this.automations = runner;
+  }
+  private runner(): AutomationRunner {
+    if (!this.automations) throw new MemoryApiError("invalid", "Automations aren't available here");
+    return this.automations;
+  }
+  async listAutomations(): Promise<AutomationsView> {
+    return this.runner().list();
+  }
+  async saveAutomation(input: AutomationInput): Promise<Automation> {
+    return this.runner().save(input);
+  }
+  async deleteAutomation(id: string): Promise<void> {
+    this.runner().delete(id);
+  }
+  async runAutomation(id: string, options?: { dryRun?: boolean }): Promise<RunRef> {
+    return this.runner().run(id, options);
+  }
+  async setAutomationsPaused(paused: boolean): Promise<AutomationsView> {
+    return this.runner().setPaused(paused);
+  }
+
+  private madePath(sessionId: string): string | undefined {
+    return /^[\w-]+$/.test(sessionId) ? join(this.deps.scratchDir, ".made", `${sessionId}.json`) : undefined;
+  }
+  private madeBefore(sessionId: string): string[] {
+    const path = this.madePath(sessionId);
+    try {
+      const list = path && existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as unknown) : [];
+      return Array.isArray(list) ? list.filter((x): x is string => typeof x === "string") : [];
+    } catch {
+      return [];
+    }
+  }
+  private rememberMade(sessionId: string, made: string[]): void {
+    const path = this.madePath(sessionId);
+    if (!path || made.length === 0) return;
+    try {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, JSON.stringify(made), "utf8");
+    } catch {
+      // bookkeeping only: a follow-up then treats these files as the project's own
+    }
+  }
+
   async activeRun(): Promise<RunRef | undefined> {
     return this.active ? { runId: this.active.runId, sessionId: this.active.sessionId } : undefined;
   }
@@ -523,7 +575,7 @@ export class AgentService implements Omit<AgentApi, "onStatus" | "onApproval" | 
       if (!project) throw new MemoryApiError("not_found", "That project no longer exists");
       root = project.path;
     } else {
-      sessionId ??= history.createSession({ title: titleFrom(text), model: settings.model }).id;
+      sessionId ??= history.createSession({ title: input.title?.trim() || titleFrom(text), model: settings.model }).id;
       root = join(this.deps.scratchDir, sessionId);
       mkdirSync(root, { recursive: true });
     }
@@ -558,7 +610,7 @@ export class AgentService implements Omit<AgentApi, "onStatus" | "onApproval" | 
       extras.images = true;
     }
 
-    if (!sessionId) sessionId = history.createSession({ ...(projectId ? { projectId } : {}), title: titleFrom(text), model: settings.model }).id;
+    if (!sessionId) sessionId = history.createSession({ ...(projectId ? { projectId } : {}), title: input.title?.trim() || titleFrom(text), model: settings.model }).id;
     const isNew = !input.sessionId;
     const run: ActiveRun = { runId: randomUUID(), sessionId, controller: new AbortController() };
     this.active = run;
@@ -593,6 +645,9 @@ export class AgentService implements Omit<AgentApi, "onStatus" | "onApproval" | 
     // Background jobs (docs downloads and embedding) wait while the model is busy with the user's task.
     this.deps.memory?.jobs.pause();
     if (projectId) this.prepareProject(projectId);
+    // What this session made in earlier messages is its own to rebuild: in a scratch folder that is
+    // everything there, in a project only the files it created.
+    const madeEarlier = projectId ? this.madeBefore(run.sessionId) : await workspace.listFiles(5000).catch(() => []);
     void (async () => {
       const memory = await this.memoryFor(run.sessionId, projectId, text, () => ids.lastUser);
       given = memory.items;
@@ -615,6 +670,8 @@ export class AgentService implements Omit<AgentApi, "onStatus" | "onApproval" | 
         history: { recorder, sessionId: run.sessionId },
         signal: run.controller.signal,
         ...(input.allowFailingChecks ? { allowFailingChecks: true } : {}),
+        ...(input.readOnly ? { readOnly: true } : {}),
+        madeEarlier,
         ...(settings.standards ? { standards: settings.standards } : {}),
         ...(this.deps.lookAtPage ? { lookAt: (page: string, signal?: AbortSignal) => this.deps.lookAtPage!(workspace.resolve(page), signal) } : {}),
         onEvent: (e) => {
@@ -626,6 +683,7 @@ export class AgentService implements Omit<AgentApi, "onStatus" | "onApproval" | 
       });
     })()
       .then((outcome) => {
+        if (projectId) this.rememberMade(run.sessionId, outcome.made);
         history.setStatus(run.sessionId, outcome.status === "done" ? "done" : "open");
         // Verified fixes in this run become episodes (summarized in the background, after the run).
         try {
