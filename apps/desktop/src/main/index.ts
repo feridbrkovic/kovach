@@ -23,6 +23,7 @@ import { serveAgent } from "./agent-ipc";
 import { AgentService, type ComputerHost, createFileSettingsStore, type MediaHost } from "./agent-service";
 import { createFixSummarizer, createMemoryExtractor, settingsModel } from "./fix-summarizer";
 import { createMfluxProvider, installMedia, mediaStatus } from "./media";
+import { formatBytes, freeScratchSpace, removeScratch, scratchUsage } from "./scratch-space";
 import { loadLoginShellPath } from "./shell-path";
 import { getLoadablePath } from "sqlite-vec";
 import { combineApi, serveHistory } from "./history-ipc";
@@ -138,7 +139,15 @@ function openMemory(): void {
       return s;
     },
   };
-  const stopHistory = serveHistory(ipcMain, combineApi(history, memoryApi), (e) => broadcast(CHANNELS.change, e));
+  const historyApi = combineApi(history, memoryApi);
+  const deleteSession = historyApi.deleteSession;
+  // A deleted session takes its scratch folder (and any packages installed there) with it.
+  historyApi.deleteSession = async (id) => {
+    const result = await deleteSession(id);
+    removeScratch(join(dataDir, "scratch"), id);
+    return result;
+  };
+  const stopHistory = serveHistory(ipcMain, historyApi, (e) => broadcast(CHANNELS.change, e));
 
   const settingsStore = createFileSettingsStore(
     join(dataDir, "settings.json"),
@@ -308,11 +317,33 @@ function runEvalsFromMenu(root: string): void {
   });
 }
 
+/** File › Free Up Space: removes installed packages and build output from the sessions' scratch folders. */
+async function freeUpSpaceFromMenu(): Promise<void> {
+  const root = join(app.getPath("userData"), "scratch");
+  const usage = scratchUsage(root);
+  if (usage.regrowableBytes === 0) {
+    await dialog.showMessageBox({ message: "Nothing to free", detail: `Sessions without a project use ${formatBytes(usage.bytes)} in ${usage.sessions} folders, none of it installed packages or build output.` });
+    return;
+  }
+  const answer = await dialog.showMessageBox({
+    type: "question",
+    message: `Free ${formatBytes(usage.regrowableBytes)}?`,
+    detail: `Sessions without a project use ${formatBytes(usage.bytes)} in ${usage.sessions} folders. ${formatBytes(usage.regrowableBytes)} of that is installed packages and build output, which come back with an install or a build. The files the sessions wrote stay.`,
+    buttons: ["Remove", "Cancel"],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (answer.response !== 0) return;
+  const active = await agent?.activeRun();
+  const freed = freeScratchSpace(root, active?.sessionId);
+  await dialog.showMessageBox({ message: `Freed ${formatBytes(freed.freedBytes)}`, detail: active ? "The session that is running was left alone." : "" });
+}
+
 function installMenu(): void {
   const root = app.isPackaged ? undefined : evalsRoot(app.getAppPath());
   const template: MenuItemConstructorOptions[] = [
     { role: "appMenu" },
-    { role: "fileMenu" },
+    { label: "File", submenu: [{ label: "Free Up Space…", click: () => void freeUpSpaceFromMenu() }, { type: "separator" }, { role: "close" }] },
     { role: "editMenu" },
     { role: "viewMenu" },
     { role: "windowMenu" },
