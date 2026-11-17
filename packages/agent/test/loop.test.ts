@@ -362,6 +362,12 @@ describe("agent loop", () => {
     const loop = scripted(Array.from({ length: 5 }, () => call("list_files", {})));
     expect((await run(loop, { maxTurns: 3 }).promise).status).toBe("max_turns");
 
+    // Out of steps is a pause, not a blank: the model says where things stand and the user can continue.
+    const wrapUp = scripted([call("list_files", {}), call("list_files", {}), say("The list screen is finished; the booking form in src/form.tsx is half-done.")]);
+    const paused = await run(wrapUp, { maxTurns: 2 }).promise;
+    expect(paused.status).toBe("max_turns");
+    expect(paused.message).toMatch(/^The list screen is finished; the booking form in src\/form\.tsx is half-done\.\n\nStopped after 2 steps without finishing\. Reply "continue" to go on from here\.$/);
+
     const controller = new AbortController();
     const aborting = scripted([
       () => {

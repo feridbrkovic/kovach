@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type ChatModel, iconFor, isErrorText, kitFiles, kitFindings, kitPackages, pickPlaybooks, placeholderBundleId, renderPlaybooks, runAgentTask, TOOLS, wireProviders, Workspace } from "../src/index.js";
+import { APP_LOOKS, appKitTool, type ChatModel, iconFor, isErrorText, kitFiles, kitFindings, kitPackages, lookFor, pickPlaybooks, placeholderBundleId, renderPlaybooks, runAgentTask, TOOLS, wireProviders, Workspace } from "../src/index.js";
 import type { ToolContext } from "../src/tools.js";
 
 let dir: string;
@@ -17,7 +17,7 @@ const INPUT = { name: "Brico", bundleId: "ba.input.brico", auth: true, features:
 
 /** What create-expo-app leaves behind, as far as the kit looks. */
 function expoProject() {
-  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "ref", dependencies: { expo: "~58.0.25", "react-native-safe-area-context": "~5.11.1" } }));
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "ref", dependencies: { expo: "~58.0.25", "react-native-safe-area-context": "~5.11.1", "react-native-reanimated": "4.7.1" } }));
   writeFileSync(join(dir, "app.json"), JSON.stringify({ expo: { name: "ref", slug: "ref", ios: { icon: "./assets/expo.icon" }, android: {} } }));
   mkdirSync(join(dir, "src/app"), { recursive: true });
   writeFileSync(join(dir, "src/app/_layout.tsx"), "export default function Layout() { return null; }\n");
@@ -50,7 +50,7 @@ describe("app kit", () => {
     expect(config.expo).toMatchObject({ name: "Brico", slug: "ref", ios: { icon: "./assets/expo.icon", bundleIdentifier: "ba.input.brico" }, android: { package: "ba.input.brico" } });
     expect(JSON.parse(readFileSync(join(dir, "eas.json"), "utf8"))).toMatchObject({ cli: { appVersionSource: "remote" }, build: { production: { autoIncrement: true } } });
     // Only what is missing gets installed, with expo install so versions match the SDK.
-    expect(out.content).toContain("`npx expo install @tanstack/react-query zod @expo/vector-icons expo-image zustand expo-secure-store expo-splash-screen`");
+    expect(out.content).toContain("`npx expo install @tanstack/react-query zod @expo/vector-icons expo-image expo-asset zustand expo-secure-store expo-splash-screen`");
     expect(out.content).toContain("In src/app/_layout.tsx, import { AppProviders }"); // this fixture's layout has no ThemeProvider
     expect(out.content).toContain("make its route file in src/app/ render the feature's screen component and nothing else");
     expect(out.content).toContain("npx expo-doctor");
@@ -98,7 +98,7 @@ describe("app kit", () => {
   it("gives screens designed parts: rows with an avatar, a second line and a status badge", () => {
     const files = kitFiles(kit.schema.parse(INPUT) as never);
     const screen = files["src/features/bookings/bookings-screen.tsx"]!;
-    for (const part of ["<ListItem", "<Avatar name={item.title}", "<Badge label={item.status} />", '<SectionHeader title="Bookings"', "ItemSeparatorComponent", "refreshControl", "<SearchField", 'router.push({ pathname: "/bookings/[id]", params: { id: item.id } })']) expect(screen).toContain(part);
+    for (const part of ["<ListItem", "<Avatar name={item.title}", "<Badge label={item.status} />", '<SectionHeader icon="calendar-outline" title="Bookings"', "<Appear index={index}>", "ItemSeparatorComponent", "refreshControl", "<SearchField", 'router.push({ pathname: "/bookings/[id]", params: { id: item.id } })']) expect(screen).toContain(part);
     const detail = files["src/features/bookings/bookings-detail-screen.tsx"]!;
     for (const part of ["useLocalSearchParams<{ id: string }>()", "useBookingsItem(id ?? \"\")", "item.details.map"]) expect(detail).toContain(part);
     expect(files["src/features/auth/account-screen.tsx"]).toContain('label="Sign out"');
@@ -122,7 +122,7 @@ describe("app kit", () => {
     expect(readFileSync(join(dir, "eas.json"), "utf8")).toBe("{}\n");
     expect(out.content).toContain("Left alone because they already existed: src/lib/api.ts, eas.json.");
     expect(existsSync(join(dir, "src/features/auth"))).toBe(false);
-    expect(kitPackages(kit.schema.parse({ ...INPUT, auth: false }) as never)).toEqual(["@tanstack/react-query", "zod", "react-native-safe-area-context", "@expo/vector-icons", "expo-image"]);
+    expect(kitPackages(kit.schema.parse({ ...INPUT, auth: false }) as never)).toEqual(["@tanstack/react-query", "zod", "react-native-safe-area-context", "react-native-reanimated", "@expo/vector-icons", "expo-image", "expo-asset"]);
   });
 
   it("writes code without any, console logging of data, or AsyncStorage for the token", () => {
@@ -166,7 +166,7 @@ describe("app kit", () => {
     };
     const outcome = await runAgentTask({ model, workspace: new Workspace(dir), task: "Build a mobile app for booking barbers, for iOS and Android", approve: async () => true, checks: [], review: false, tools: [...TOOLS.filter((t) => t.name !== "run_command"), runCommand as never] });
     expect(outcome.status).toBe("done");
-    expect(commands).toEqual(["npx --yes create-expo-app@latest . --template default", "npm install --no-audit --no-fund", "npx expo install @tanstack/react-query zod @expo/vector-icons expo-image zustand expo-secure-store expo-splash-screen"]);
+    expect(commands).toEqual(["npx --yes create-expo-app@latest . --template default", "npm install --no-audit --no-fund", "npx expo install @tanstack/react-query zod @expo/vector-icons expo-image expo-asset zustand expo-secure-store expo-splash-screen"]);
     expect(notes[1]).toMatch(/^The packages are installed/);
     expect(outcome.plan!.steps.map((x) => x.title)).toEqual(["Create the Expo project with create-expo-app", "Add the architecture with app_kit", "Install the packages and wrap the root layout in AppProviders", "Build each feature in its folder and give it a route", "Run the checks: tsc, expo lint, expo-doctor"]);
     expect(notes[0]).toMatch(/^The Expo project now exists: it was created with `npx create-expo-app@latest`/);
@@ -284,5 +284,42 @@ describe("app kit", () => {
     expect(readFileSync(join(dir, "expo-env.d.ts"), "utf8")).toContain('/// <reference types="expo/types" />');
     expect(existsSync(join(dir, "src/components/app-tabs.tsx"))).toBe(false);
     expect(existsSync(join(dir, "src/components/app-tabs.web.tsx"))).toBe(false);
+  });
+  it("gives the app a look that fits the business, and motion, icons and pictures as parts", async () => {
+    const barber = { ...INPUT, business: "barber shop bookings app" };
+    expect(lookFor(barber)).toBe("dark-studio"); // "app" alone must not pick the software look
+    expect(lookFor({ ...INPUT, business: "bakery orders" })).toBe("warm-editorial");
+    expect(lookFor({ ...INPUT, direction: "bold-modern", business: "bakery orders" })).toBe("bold-modern");
+    const tokens = kitFiles(barber)["src/theme/tokens.ts"]!;
+    expect(tokens).toContain(`primary: "${APP_LOOKS["dark-studio"]!.dark.primary}"`);
+    expect(tokens).toContain("export const radius = { sm: 4, md: 10, lg: 16, pill: 999 } as const;");
+    expect(tokens).toContain('danger: "#B42318"'); // colours the look doesn't set stay
+
+    const files = kitFiles(barber, { bookings: ["assets/images/sample/barber-1.jpg", "assets/images/sample/barber-2.jpg"] });
+    const motion = files["src/components/ui/motion.tsx"]!;
+    expect(motion).toContain("export function Appear(");
+    expect(motion).toContain('{ perspective: 700 }, { rotateX: pressed.value * 7 + "deg" }');
+    expect(files["src/components/ui/list-item.tsx"]).toContain("<Tilt");
+    expect(files["src/components/ui/states.tsx"]).toContain('icon = "file-tray-outline"');
+    const sample = files["src/features/bookings/sample.ts"]!;
+    expect(sample).toContain('import { Asset } from "expo-asset";');
+    expect(sample).toContain('imageUrl: photo(require("@/assets/images/sample/barber-1.jpg"))');
+    expect(files["src/features/bookings/bookings-detail-screen.tsx"]).toContain("<Image source={{ uri: item.imageUrl }}");
+    // Without pictures the sample has no imports beyond its type.
+    expect(kitFiles(barber)["src/features/bookings/sample.ts"]).not.toContain("expo-asset");
+  });
+
+  it("fetches pictures for the sample rows when it has web access, and works without", async () => {
+    expoProject();
+    const jpeg = Buffer.alloc(3000, 7); // big enough to pass for a picture
+    const results = Array.from({ length: 8 }, (_, i) => ({ id: `p${i}`, title: `Barber cutting hair ${i}`, creator: "Someone", license: "cc0", license_version: "1.0", url: `https://img.example/barber-${i}.jpg`, foreign_landing_url: `https://stock.example/p${i}`, width: 1600, height: 1600, source: "stocksnap", tags: [{ name: "barber" }, { name: "hair" }, { name: "cutting" }] }));
+    const fetchFake = (async (url: string | URL) => (String(url).includes("img.example") ? new Response(jpeg, { headers: { "content-type": "image/jpeg" } }) : new Response(JSON.stringify({ results })))) as typeof fetch;
+    const withPhotos = appKitTool({ photos: { fetch: fetchFake } });
+    const input = { ...INPUT, features: [{ name: "barbers", purpose: "Barbers near the user.", photo: "barber cutting hair", samples: [{ title: "Marko" }, { title: "Amar" }, { title: "Dino" }] }] };
+    const out = await withPhotos.run(withPhotos.schema.parse(input), ctx());
+    expect(out.ok).toBe(true);
+    const sample = readFileSync(join(dir, "src/features/barbers/sample.ts"), "utf8");
+    expect(sample).toMatch(/imageUrl: photo\(require\("@\/assets\/images\/sample\/[\w-]+\.jpg"\)\)/);
+    expect(existsSync(join(dir, "assets/images/sample/CREDITS.md"))).toBe(true);
   });
 });

@@ -819,7 +819,9 @@ describe("proposed memories in the app", () => {
     const calls: string[] = [];
     const memory = createMemoryStore(db, { extractor: () => extractor(calls) });
     memory.jobs.start();
-    const svc = service(scripted([call("read_file", { path: "nope.txt" }), call("read_file", { path: "nope.txt" }), say("ok")]), {
+    // Each run ends at its step limit; the loop then asks once more for a wrap-up, which uses a reply too.
+    const read = () => call("read_file", { path: "nope.txt" });
+    const svc = service(scripted([read(), read(), read(), read(), say("ok")]), {
       memory,
       extractionIdleMs: 600,
       runOptions: { plan: false, maxTurns: 1 },

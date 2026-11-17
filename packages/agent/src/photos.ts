@@ -57,7 +57,10 @@ async function searchOnce(query: string, wanted: string[], cfg: PhotoConfig, sig
   // Public domain and attribution-only licences: the photos are resized and cropped, which share-alike and
   // no-derivatives licences restrict.
   const params = new URLSearchParams({ q: query, license: "cc0,pdm,by", category: "photograph", source: STOCK_SOURCES, mature: "false", page_size: "20" });
-  const res = await (cfg.fetch ?? fetch)(`${cfg.endpoint ?? ENDPOINT}?${params}`, { ...(signal ? { signal } : {}), headers: { "user-agent": AGENT, accept: "application/json" } });
+  const ask = () => (cfg.fetch ?? fetch)(`${cfg.endpoint ?? ENDPOINT}?${params}`, { ...(signal ? { signal } : {}), headers: { "user-agent": AGENT, accept: "application/json" } });
+  let res = await ask();
+  // The search answers 5xx now and then under load; one more try usually gets through.
+  if (res.status >= 500 && !signal?.aborted) res = await ask();
   if (res.status === 429) throw new Error("the photo search is rate-limited right now");
   if (!res.ok) throw new Error(`the photo search returned ${res.status}`);
   const body = (await res.json()) as { results?: Record<string, unknown>[] };
@@ -99,13 +102,23 @@ export async function searchPhotos(query: string, orientation: "wide" | "tall" |
   const [a, b, c] = words;
   const queries = [...new Set([words.slice(0, 3).join(" "), b && `${a} ${b}`, c && `${b} ${c}`, c && `${a} ${c}`, b, a].filter((q): q is string => !!q))];
   const found: Candidate[] = [];
+  let failure: unknown;
   for (const q of queries.slice(0, MAX_SEARCHES)) {
-    for (const p of await searchOnce(q, words, cfg, signal)) {
+    let hits: Candidate[];
+    try {
+      hits = await searchOnce(q, words, cfg, signal);
+    } catch (err) {
+      // One wording failing must not lose the photos the other wordings would find.
+      failure = err;
+      continue;
+    }
+    for (const p of hits) {
       if (p.matched < need || p.width < 1000 || !/^https:\/\//.test(p.url) || !/\.(jpe?g|png|webp)(\?|$)/i.test(p.url)) continue;
       if (!found.some((f) => f.url === p.url || (f.title && f.title === p.title))) found.push(p);
     }
     if (found.filter((p) => p.stock).length >= want) break;
   }
+  if (found.length === 0 && failure) throw failure;
   const fits = (p: Candidate) => (orientation === "tall" ? p.height > p.width : orientation === "wide" ? p.width > p.height : true);
   return found
     .filter((p) => p.stock)

@@ -10,6 +10,8 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { z } from "zod";
+import { pickDirection } from "./design-kit.js";
+import { type PhotoConfig, savePhotos } from "./photos.js";
 import type { AgentTool, ToolContext, ToolOutcome } from "./tools.js";
 
 export const AppKitInput = z.object({
@@ -20,13 +22,23 @@ export const AppKitInput = z.object({
     .optional()
     .describe("Reverse-domain identifier used on both stores, e.g. 'ba.input.barber'. Leave it out when the user hasn't given one: a placeholder made from the name is used and reported. Don't stop to ask for it"),
   auth: z.boolean().default(false).describe("true when users sign in"),
+  business: z.string().max(80).optional().describe("What the app is for, in a few words: 'barber shop bookings', 'bakery orders'. Picks the look (colours, corners)"),
+  direction: z.enum(["warm-editorial", "bold-modern", "calm-professional", "dark-studio"]).optional().describe("Set only when the user asked for a particular look; otherwise it follows from business"),
   features: z
     .array(
       z.object({
         name: z.string().regex(/^[a-z][a-z0-9-]*$/).describe("kebab-case, e.g. 'bookings'"),
         purpose: z.string().min(3).max(120),
+        photo: z.string().max(40).optional().describe("Two or three words naming what a row of this area shows, for stock photos: 'barber cutting hair', 'sourdough loaf'. Leave out for rows that are not a person, place or thing (bookings, invoices)"),
         samples: z
-          .array(z.object({ title: z.string().min(1).max(60), subtitle: z.string().max(80).optional(), status: z.string().max(20).optional() }))
+          .array(
+            z.object({
+              title: z.string().min(1).max(60),
+              subtitle: z.string().max(80).optional(),
+              status: z.string().max(20).optional(),
+              details: z.array(z.object({ label: z.string().max(30), value: z.string().max(60) })).max(6).optional().describe("Facts for the detail screen, e.g. label 'Haircut', value 'from 20 KM'"),
+            }),
+          )
           .max(8)
           .optional()
           .describe("3 to 6 realistic items for this area, e.g. for bookings: title 'Classic cut', subtitle 'Sat 5 Dec, 11:00 · Amar', status 'Confirmed'. The app shows them in development until the server exists, so the real calls never have to be replaced with made-up data"),
@@ -47,9 +59,63 @@ const PARTS = `Build screens from these parts (import each from "@/components/ui
 - SearchField { value, onChangeText, placeholder? } from search-field.
 - Card { children, ...View props } from card.
 - ListItem { title, subtitle?, leading?, trailing?, onPress? } from list-item; Avatar { name, uri?, size? } from avatar; Badge { label, tone? } from badge.
-- SectionHeader { title, detail? } from section-header.
-- Loading, Empty { title, hint? }, Failed { message, onRetry? } from states.
+- SectionHeader { title, detail?, icon? } from section-header (icon is an Ionicons name).
+- Loading, Empty { title, hint?, icon? }, Failed { message, onRetry? } from states.
+- Appear { index?, children } and Tilt { onPress?, children } from motion: wrap new rows and cards in Appear so they fade up in turn; use Tilt for anything pressable so it leans under the finger. Don't write other animation code.
 Colours, spacing, radii and text sizes come from src/theme/tokens.ts; don't restyle from scratch.`;
+
+/** A look for the app: the same four directions the page builder uses, as app colours and corners. */
+interface Look {
+  light: Record<string, string>;
+  dark: Record<string, string>;
+  radius: { sm: number; md: number; lg: number };
+  tints: string[];
+}
+const BASE_TINTS = ["#DCE8F5", "#F5E3D7", "#E3EFEA", "#EFE3F3", "#F3EBCF", "#DDEFF0"];
+export const APP_LOOKS: Record<string, Look> = {
+  "calm-professional": { light: {}, dark: {}, radius: { sm: 6, md: 12, lg: 20 }, tints: BASE_TINTS },
+  "warm-editorial": {
+    light: { background: "#F7F0E4", surface: "#FFFDF8", text: "#2B1D13", muted: "#6D5B4B", line: "#E2D5C0", primary: "#B4472A", onPrimary: "#FFF7EC", primarySoft: "#F6E1D6" },
+    dark: { background: "#17110D", surface: "#221912", text: "#F4EADB", muted: "#B5A594", line: "#3A2C20", primary: "#E98B6C", onPrimary: "#2A1208", primarySoft: "#3A2018" },
+    radius: { sm: 8, md: 14, lg: 22 },
+    tints: ["#F6E1D6", "#EFE3C8", "#E6EAD3", "#F3DDD0", "#E9DCC6", "#F1E6D8"],
+  },
+  "bold-modern": {
+    light: { background: "#F4F4F8", surface: "#FFFFFF", text: "#0E0E14", muted: "#5B5E6B", line: "#E3E4EC", primary: "#5B3DF5", onPrimary: "#FFFFFF", primarySoft: "#EAE6FF" },
+    dark: { background: "#0B0B11", surface: "#16161F", text: "#F3F3F8", muted: "#A2A5B5", line: "#2A2B39", primary: "#9C8CFF", onPrimary: "#0F0A2A", primarySoft: "#231E47" },
+    radius: { sm: 8, md: 16, lg: 26 },
+    tints: ["#EAE6FF", "#DDF3FF", "#FFE6F0", "#E3FBEA", "#FFF1D6", "#E6EEFF"],
+  },
+  "dark-studio": {
+    light: { background: "#F3F2EE", surface: "#FFFFFF", text: "#141414", muted: "#605F5A", line: "#E0DED7", primary: "#1B1B1D", onPrimary: "#F5D48A", primarySoft: "#ECE8DC" },
+    dark: { background: "#0C0C0D", surface: "#17171A", text: "#F5F3EE", muted: "#A19E96", line: "#2A2A2E", primary: "#E6B450", onPrimary: "#1A1304", primarySoft: "#2B2413" },
+    radius: { sm: 4, md: 10, lg: 16 },
+    tints: ["#ECE8DC", "#E3E1DA", "#EFE6D2", "#E2E4E0", "#EDE2D8", "#E6E6E6"],
+  },
+};
+
+/** The look for an app: the one asked for, else the one its kind of business suggests. */
+export function lookFor(input: { name: string; business?: string | undefined; direction?: string | undefined; features: { purpose: string }[] }): string {
+  // "app" and "mobile" describe every app; left in, they would always pick the software look.
+  const about = (input.business ?? `${input.name} ${input.features.map((f) => f.purpose).join(" ")}`).replace(/\b(mobile|apps?|application)\b/gi, " ");
+  return pickDirection(about, input.direction).id;
+}
+
+function applyLook(tokens: string, id: string): string {
+  const look = APP_LOOKS[id] ?? APP_LOOKS["calm-professional"]!;
+  const recolor = (line: string, colours: Record<string, string>) =>
+    Object.entries(colours).reduce((out, [key, value]) => out.replace(new RegExp(`\\b${key}: "#[0-9A-Fa-f]{6}"`), `${key}: "${value}"`), line);
+  return tokens
+    .split("\n")
+    .map((line) => {
+      if (line.startsWith("  light: ")) return recolor(line, look.light);
+      if (line.startsWith("  dark: ")) return recolor(line, look.dark);
+      if (line.startsWith("export const radius = ")) return `export const radius = { sm: ${look.radius.sm}, md: ${look.radius.md}, lg: ${look.radius.lg}, pill: 999 } as const;`;
+      if (line.startsWith("export const tints = ")) return `export const tints = ${JSON.stringify(look.tints)} as const;`;
+      return line;
+    })
+    .join("\n");
+}
 
 /** What a finished app must still have: each feature's api.ts talking to the server through request(). */
 export function kitFindings(read: (path: string) => string | undefined, features: string[]): string[] {
@@ -77,7 +143,8 @@ const camel = (kebab: string) => pascal(kebab).replace(/^./, (c) => c.toLowerCas
 const titleOf = (kebab: string) => kebab.replace(/(^|-)([a-z0-9])/g, (_m, dash: string, c: string) => `${dash ? " " : ""}${c.toUpperCase()}`);
 
 /** Files every app gets. Paths are relative to the project root; `@/` is the template's alias for src/. */
-export function kitFiles(input: AppKitInput): Record<string, string> {
+/** \`photos\` maps a feature's name to the pictures saved for its sample rows (paths under assets/). */
+export function kitFiles(input: AppKitInput, photos: Record<string, string[]> = {}): Record<string, string> {
   const files: Record<string, string> = {
     ".env.example": `# Copy to .env. EXPO_PUBLIC_ variables are compiled into the app: never put secrets here.\nEXPO_PUBLIC_API_URL=https://api.example.com\n`,
 
@@ -360,10 +427,12 @@ const styles = StyleSheet.create({
 });
 `,
 
-    "src/components/ui/states.tsx": `import { ActivityIndicator, StyleSheet, View } from "react-native";
+    "src/components/ui/states.tsx": `import Ionicons from "@expo/vector-icons/Ionicons";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/ui/app-text";
 import { Button } from "@/components/ui/button";
+import { Appear } from "@/components/ui/motion";
 import { space } from "@/theme/tokens";
 import { useColors } from "@/theme/use-colors";
 
@@ -377,9 +446,15 @@ export function Loading() {
   );
 }
 
-export function Empty({ title, hint }: { title: string; hint?: string }) {
+export function Empty({ title, hint, icon = "file-tray-outline" }: { title: string; hint?: string; icon?: keyof typeof Ionicons.glyphMap }) {
+  const colors = useColors();
   return (
     <View style={styles.center}>
+      <Appear>
+        <View style={[styles.badge, { backgroundColor: colors.primarySoft }]}>
+          <Ionicons name={icon} size={30} color={String(colors.primary)} />
+        </View>
+      </Appear>
       <AppText variant="heading">{title}</AppText>
       {hint ? <AppText tone="muted">{hint}</AppText> : null}
     </View>
@@ -397,7 +472,58 @@ export function Failed({ message, onRetry }: { message: string; onRetry?: () => 
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, padding: space.lg },
+  badge: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center" },
 });
+`,
+
+    "src/components/ui/motion.tsx": `import type { ReactNode } from "react";
+import { Pressable, type StyleProp, type ViewStyle } from "react-native";
+import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+
+/**
+ * Content that arrives: rows and cards fade up one after another.
+ * Reanimated leaves the animation out when the system asks for reduced motion.
+ */
+export function Appear({ index = 0, children, style }: { index?: number; children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  return (
+    <Animated.View entering={FadeInDown.delay(Math.min(index, 8) * 45).duration(380)} style={style}>
+      {children}
+    </Animated.View>
+  );
+}
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+interface TiltProps {
+  children: ReactNode;
+  onPress?: () => void;
+  accessibilityLabel?: string;
+  style?: StyleProp<ViewStyle>;
+}
+
+/** A surface that leans back under the finger and springs up again: depth instead of a flat fade. */
+export function Tilt({ children, onPress, accessibilityLabel, style }: TiltProps) {
+  const pressed = useSharedValue(0);
+  const lean = useAnimatedStyle(() => ({
+    transform: [{ perspective: 700 }, { rotateX: pressed.value * 7 + "deg" }, { scale: 1 - pressed.value * 0.03 }],
+  }));
+  return (
+    <AnimatedPressable
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={accessibilityLabel}
+      disabled={!onPress}
+      onPress={onPress}
+      onPressIn={() => {
+        pressed.value = withSpring(1, { damping: 18, stiffness: 320 });
+      }}
+      onPressOut={() => {
+        pressed.value = withSpring(0, { damping: 12, stiffness: 220 });
+      }}
+      style={[style, lean]}>
+      {children}
+    </AnimatedPressable>
+  );
+}
 `,
 
     "src/components/ui/card.tsx": `import type { ReactNode } from "react";
@@ -492,10 +618,12 @@ const styles = StyleSheet.create({
 });
 `,
 
-    "src/components/ui/list-item.tsx": `import type { ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+    "src/components/ui/list-item.tsx": `import Ionicons from "@expo/vector-icons/Ionicons";
+import type { ReactNode } from "react";
+import { StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/ui/app-text";
+import { Tilt } from "@/components/ui/motion";
 import { radius, shadow, space } from "@/theme/tokens";
 import { useColors } from "@/theme/use-colors";
 
@@ -513,12 +641,10 @@ interface ListItemProps {
 export function ListItem({ title, subtitle, leading, trailing, onPress }: ListItemProps) {
   const colors = useColors();
   return (
-    <Pressable
-      accessibilityRole={onPress ? "button" : undefined}
+    <Tilt
       accessibilityLabel={subtitle ? title + ", " + subtitle : title}
-      disabled={!onPress}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, shadow, { backgroundColor: colors.surface, borderColor: colors.line, opacity: pressed ? 0.85 : 1 }]}>
+      style={[styles.row, shadow, { backgroundColor: colors.surface, borderColor: colors.line }]}>
       {leading}
       <View style={styles.text}>
         <AppText variant="label" style={styles.title} numberOfLines={1}>
@@ -531,12 +657,8 @@ export function ListItem({ title, subtitle, leading, trailing, onPress }: ListIt
         ) : null}
       </View>
       {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
-      {onPress ? (
-        <AppText tone="muted" style={styles.chevron}>
-          ›
-        </AppText>
-      ) : null}
-    </Pressable>
+      {onPress ? <Ionicons name="chevron-forward" size={18} color={String(colors.muted)} /> : null}
+    </Tilt>
   );
 }
 
@@ -546,27 +668,40 @@ const styles = StyleSheet.create({
   trailing: { alignSelf: "center" },
   title: { fontSize: 16, lineHeight: 22 },
   subtitle: { fontSize: 13, lineHeight: 18 },
-  chevron: { fontSize: 22, lineHeight: 24 },
 });
 `,
 
-    "src/components/ui/section-header.tsx": `import { StyleSheet, View } from "react-native";
+    "src/components/ui/section-header.tsx": `import Ionicons from "@expo/vector-icons/Ionicons";
+import { StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/ui/app-text";
-import { space } from "@/theme/tokens";
+import { radius, space } from "@/theme/tokens";
+import { useColors } from "@/theme/use-colors";
 
-/** The heading above a list or group, with how many there are. */
-export function SectionHeader({ title, detail }: { title: string; detail?: string }) {
+type IconName = keyof typeof Ionicons.glyphMap;
+
+/** The heading above a list or group: an icon in the app's colour, the title, and how many there are. */
+export function SectionHeader({ title, detail, icon }: { title: string; detail?: string; icon?: IconName }) {
+  const colors = useColors();
   return (
     <View style={styles.row}>
-      <AppText variant="title">{title}</AppText>
+      {icon ? (
+        <View style={[styles.icon, { backgroundColor: colors.primarySoft }]}>
+          <Ionicons name={icon} size={20} color={String(colors.primary)} />
+        </View>
+      ) : null}
+      <AppText variant="title" style={styles.title}>
+        {title}
+      </AppText>
       {detail ? <AppText tone="muted">{detail}</AppText> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", paddingBottom: space.sm },
+  row: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingBottom: space.sm },
+  title: { flex: 1 },
+  icon: { width: 40, height: 40, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
 });
 `,
 
@@ -832,15 +967,16 @@ export async function fetch${Name}Item(id: string, signal?: AbortSignal): Promis
 }
 `;
     const samples = f.samples?.length ? f.samples : [1, 2, 3].map((n) => ({ title: `${titleOf(f.name)} ${n}`, subtitle: "Sample item", status: undefined }));
-    files[`${dir}/sample.ts`] = `import type { ${Name}Item } from "@/features/${f.name}/api";
-
+    const shots = photos[f.name] ?? [];
+    files[`${dir}/sample.ts`] = `${shots.length ? 'import { Asset } from "expo-asset";\n\n' : ""}import type { ${Name}Item } from "@/features/${f.name}/api";
+${shots.length ? "\n/** A bundled picture as an address, the way the server would send one. Credits are in assets/images/sample/CREDITS.md. */\nconst photo = (file: number) => Asset.fromModule(file).uri;\n" : ""}
 /**
  * Shown in development until EXPO_PUBLIC_API_URL points at a real server.
  * Change it freely; api.ts keeps the real calls.
  */
 export const ${name}Sample: ${Name}Item[] = [
 ${samples
-  .map((x, i) => `  { id: "${i + 1}", title: ${JSON.stringify(x.title)}${x.subtitle ? `, subtitle: ${JSON.stringify(x.subtitle)}` : ""}${x.status ? `, status: ${JSON.stringify(x.status)}` : ""} },`)
+  .map((x, i) => `  { id: "${i + 1}", title: ${JSON.stringify(x.title)}${x.subtitle ? `, subtitle: ${JSON.stringify(x.subtitle)}` : ""}${x.status ? `, status: ${JSON.stringify(x.status)}` : ""}${shots.length ? `, imageUrl: photo(require("@/${shots[i % shots.length]}"))` : ""}${"details" in x && x.details?.length ? `, details: ${JSON.stringify(x.details)}` : ""} },`)
   .join("\n")}
 ];
 `;
@@ -866,6 +1002,7 @@ import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ListItem } from "@/components/ui/list-item";
+import { Appear } from "@/components/ui/motion";
 import { Screen } from "@/components/ui/screen";
 import { SearchField } from "@/components/ui/search-field";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -888,7 +1025,11 @@ function Row({ item }: { item: ${Name}Item }) {
   );
 }
 
-const renderRow = ({ item }: { item: ${Name}Item }) => <Row item={item} />;
+const renderRow = ({ item, index }: { item: ${Name}Item; index: number }) => (
+  <Appear index={index}>
+    <Row item={item} />
+  </Appear>
+);
 const keyOf = (item: ${Name}Item) => item.id;
 const Gap = () => <View style={styles.gap} />;
 
@@ -912,12 +1053,12 @@ export function ${Name}Screen() {
         ItemSeparatorComponent={Gap}
         ListHeaderComponent={
           <View style={styles.head}>
-            <SectionHeader title="${titleOf(f.name)}" detail={env.sampleData ? "Sample data" : query.data.length ? String(query.data.length) : undefined} />
+            <SectionHeader icon="${iconFor(f.name)}" title="${titleOf(f.name)}" detail={env.sampleData ? "Sample data" : query.data.length ? String(query.data.length) : undefined} />
             {query.data.length > 4 ? <SearchField value={search} onChangeText={setSearch} placeholder="Search ${titleOf(f.name).toLowerCase()}" /> : null}
           </View>
         }
         refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} />}
-        ListEmptyComponent={search ? <Empty title="No matches" hint="Try a different search." /> : <Empty title="Nothing here yet" hint="Pull down to refresh." />}
+        ListEmptyComponent={search ? <Empty icon="search-outline" title="No matches" hint="Try a different search." /> : <Empty icon="${iconFor(f.name)}" title="Nothing here yet" hint="Pull down to refresh." />}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -932,17 +1073,19 @@ const styles = StyleSheet.create({
   gap: { height: space.sm },
 });
 `;
-    files[`${dir}/${f.name}-detail-screen.tsx`] = `import { useLocalSearchParams } from "expo-router";
+    files[`${dir}/${f.name}-detail-screen.tsx`] = `import { Image } from "expo-image";
+import { useLocalSearchParams } from "expo-router";
 import { StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/ui/app-text";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Appear } from "@/components/ui/motion";
 import { Screen } from "@/components/ui/screen";
 import { Failed, Loading } from "@/components/ui/states";
 import { use${Name}Item } from "@/features/${f.name}/use-${f.name}";
-import { space } from "@/theme/tokens";
+import { radius, space } from "@/theme/tokens";
 import { useColors } from "@/theme/use-colors";
 
 /** One item in full: who or what it is, its state, its facts. Add this screen's actions under the card. */
@@ -955,8 +1098,13 @@ export function ${Name}DetailScreen() {
   const item = query.data;
   return (
     <Screen>
+      {item.imageUrl ? (
+        <Appear>
+          <Image source={{ uri: item.imageUrl }} style={[styles.photo, { backgroundColor: colors.primarySoft }]} contentFit="cover" transition={250} accessibilityLabel={item.title} />
+        </Appear>
+      ) : null}
       <View style={styles.hero}>
-        <Avatar name={item.title} uri={item.imageUrl} size={88} />
+        {item.imageUrl ? null : <Avatar name={item.title} size={88} />}
         <View style={styles.heroText}>
           <AppText variant="title">{item.title}</AppText>
           {item.subtitle ? <AppText tone="muted">{item.subtitle}</AppText> : null}
@@ -964,7 +1112,8 @@ export function ${Name}DetailScreen() {
         </View>
       </View>
       {item.details?.length ? (
-        <Card>
+        <Appear index={2}>
+          <Card>
           {item.details.map((fact, index) => (
             <View key={fact.label} style={[styles.fact, index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line }]}>
               <AppText tone="muted">{fact.label}</AppText>
@@ -973,13 +1122,15 @@ export function ${Name}DetailScreen() {
               </AppText>
             </View>
           ))}
-        </Card>
+          </Card>
+        </Appear>
       ) : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  photo: { width: "100%", aspectRatio: 16 / 10, borderRadius: radius.lg },
   hero: { flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: space.sm },
   heroText: { flex: 1, gap: space.xs },
   fact: { flexDirection: "row", justifyContent: "space-between", gap: space.md, paddingVertical: space.sm },
@@ -988,6 +1139,7 @@ const styles = StyleSheet.create({
 `;
   }
 
+  files["src/theme/tokens.ts"] = applyLook(files["src/theme/tokens.ts"]!, lookFor(input));
   files["docs/ARCHITECTURE.md"] = `# Architecture
 
 ${input.name} is an Expo app. Routes are files in the router's \`app\` folder; everything else lives beside it under \`src/\`.
@@ -1128,9 +1280,10 @@ ${tabs.map((t) => `      <Tabs.Screen name="${t.name}" options={{ title: "${t.ti
 }
 
 /** Packages the kit's files import beyond the template's own. Installed with `expo install` so versions match the SDK. */
-export const kitPackages = (input: AppKitInput) => ["@tanstack/react-query", "zod", "react-native-safe-area-context", "@expo/vector-icons", "expo-image", ...(input.auth ? ["zustand", "expo-secure-store", "expo-splash-screen"] : [])];
+export const kitPackages = (input: AppKitInput) => ["@tanstack/react-query", "zod", "react-native-safe-area-context", "react-native-reanimated", "@expo/vector-icons", "expo-image", "expo-asset", ...(input.auth ? ["zustand", "expo-secure-store", "expo-splash-screen"] : [])];
 
-export function appKitTool(): AgentTool {
+/** With \`photos\` (web access on) the kit also fetches stock pictures for the sample rows. */
+export function appKitTool(cfg: { photos?: PhotoConfig } = {}): AgentTool {
   return {
     name: "app_kit",
     description:
@@ -1167,7 +1320,21 @@ export function appKitTool(): AgentTool {
         ctx.createdThisRun?.add(rel);
         written.push(rel);
       };
-      for (const [rel, content] of Object.entries(kitFiles(input))) write(rel, content);
+      // Pictures for the sample rows, so lists and detail screens are not all initials. Never fatal.
+      const photos: Record<string, string[]> = {};
+      if (cfg.photos) {
+        for (const f of input.features) {
+          if (!f.photo || existsSync(ctx.workspace.resolve(`src/features/${f.name}/sample.ts`))) continue;
+          try {
+            const want = Math.min(Math.max(f.samples?.length ?? 3, 3), 6);
+            const got = await savePhotos(f.photo, want, "square", "assets/images/sample", cfg.photos, ctx);
+            if (got.length) photos[f.name] = got.map((x) => x.path);
+          } catch {
+            // no pictures: the rows show initials
+          }
+        }
+      }
+      for (const [rel, content] of Object.entries(kitFiles(input, photos))) write(rel, content);
       write("eas.json", EAS_JSON);
       // What \`expo start\` writes on first run; without it \`tsc\` can't resolve the template's CSS imports.
       write("expo-env.d.ts", '/// <reference types="expo/types" />\n\n// NOTE: This file should not be edited and should be in your git ignore\n');

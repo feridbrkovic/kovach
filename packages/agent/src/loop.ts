@@ -171,7 +171,8 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
   const specs = toolSpecs(tools);
   const byName = new Map(tools.map((t) => [t.name, t]));
   const checks = options.checks ?? detectChecks(workspace.root);
-  const maxTurns = options.maxTurns ?? 40;
+  // A new app or page is many files: those runs get a larger budget (set where the kit is chosen).
+  let maxTurns = options.maxTurns ?? 40;
   const maxCheckRounds = options.maxCheckRounds ?? 3;
   const maxInvalid = options.maxInvalidToolTurns ?? 3;
   const ctx: ToolContext = {
@@ -257,6 +258,7 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
       // A new mobile app in an empty folder is created by Expo's own generator, not typed out by
       // the model: its hand-written package.json and template are a year out of date.
       const newApp = !buildWithKit && files.length === 0 && tools.some((t) => t.name === "app_kit") && tools.some((t) => t.name === "run_command") && wantsNewApp(textOf(options.task)) && pickPlaybooks(textOf(options.task), []).some((p) => p.id === "react-native");
+      if (newApp && options.maxTurns === undefined) maxTurns = 70;
       if (plan && newApp) {
         plan.steps = [
           { title: "Create the Expo project with create-expo-app", files: ["package.json"] },
@@ -500,7 +502,22 @@ export async function runAgentTask(options: AgentOptions): Promise<AgentOutcome>
         record("tool", note);
       }
     }
-    return finish("max_turns", `Stopped after ${maxTurns} turns without finishing.`);
+    // Out of steps. What was built is on disk and the session can be continued, so the user is
+    // owed where things stand rather than a bare "stopped" (seen live after a 40-step app build).
+    const stopped = `Stopped after ${maxTurns} steps without finishing. Reply "continue" to go on from here.`;
+    if (options.signal?.aborted) return finish("max_turns", stopped);
+    const wrap = "You are out of steps for this run. Without tools, say in a few lines where things stand: what is finished, what is half-done (name the file), and what is left to do.";
+    messages.push({ role: "user", content: wrap });
+    record("tool", wrap);
+    let summary = "";
+    try {
+      const last = await model.complete({ messages, ...(options.signal ? { signal: options.signal } : {}) });
+      if (last.toolCalls.length === 0 && !isErrorText(last.content)) summary = last.content.trim();
+    } catch {
+      summary = ""; // the wrap-up is a courtesy; a model error here must not hide the stop
+    }
+    if (summary) emit({ type: "assistant", content: summary });
+    return finish("max_turns", summary ? `${summary}\n\n${stopped}` : stopped);
   } catch (err) {
     if (options.signal?.aborted) return finish("aborted", "Stopped by the user.");
     return finish("error", err instanceof Error ? err.message : String(err));

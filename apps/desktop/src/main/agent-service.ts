@@ -21,6 +21,7 @@ import {
   runAgentTask,
   TOOLS,
   Workspace,
+  appKitTool,
   designKitTool,
   photoTools,
   webTools,
@@ -539,6 +540,9 @@ export class AgentService implements Omit<AgentApi, "onStatus" | "onApproval" | 
       const photos = { ...(this.deps.fetch ? { fetch: this.deps.fetch } : {}), ...(this.deps.resizeImage ? { resize: this.deps.resizeImage } : {}) };
       const kit = tools.findIndex((t) => t.name === "design_kit");
       if (kit >= 0) tools[kit] = designKitTool({ photos });
+      // The same for apps: the app kit fetches pictures for its sample rows.
+      const appKit = tools.findIndex((t) => t.name === "app_kit");
+      if (appKit >= 0) tools[appKit] = appKitTool({ photos });
       tools.push(...photoTools(photos));
       extras.web = true;
     }
