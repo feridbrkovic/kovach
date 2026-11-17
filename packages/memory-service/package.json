@@ -1,0 +1,30 @@
+{
+  "name": "@kovach-dev/memory-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local Kovach memory service: SQLite storage, migrations, retrieval",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "migrate:check": "tsx scripts/migrate-check.ts"
+  },
+  "dependencies": {
+    "@kovach-dev/memory-contract": "workspace:*",
+    "better-sqlite3": "^12.4.1",
+    "sqlite-vec": "^0.1.9"
+  },
+  "devDependencies": {
+    "@kovach-dev/agent-fixtures": "workspace:*",
+    "@types/better-sqlite3": "^7.6.13",
+    "tsx": "^4.20.6"
+  }
+}
