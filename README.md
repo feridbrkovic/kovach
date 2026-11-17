@@ -26,6 +26,18 @@ The name comes from the Bosnian *kovač*, a smith: the one who forges and reshap
 
 > **Status: early.** It is used daily by its author on one machine and is built from source. There is no signed release yet, and the interfaces still change. The design is in [MASTER_PLAN.md](MASTER_PLAN.md); progress is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
+## Built for software engineering
+
+Local Kovach is not a general chat assistant with a terminal attached. Every part of it is shaped by how software gets built:
+
+- **Done means the checks pass.** The project's own typecheck, lint and tests decide when a task is finished, not the model's opinion of its work.
+- **It knows the stack it is in.** Playbooks for React Native and Expo, native iOS and Android, web pages, search-engine work and store releases are part of the plan for the matching kind of project and change.
+- **It reads the docs for your versions**, not the ones it remembers: packs are built from each library's own repository for the versions in your lockfile.
+- **It learns from fixed errors.** A fix is stored under the normalised error it resolved and comes back when that error appears again, in this project or another.
+- **It follows your conventions.** Rules from `AGENTS.md`, editor rule files and your own stated preferences are retrieved for the task at hand.
+- **It navigates code like an IDE**: definitions, references and outlines from the TypeScript language service and Tree-sitter.
+- **It starts projects the way the ecosystem does**: Expo's generator for apps, then a kit for the architecture, instead of files written from memory.
+
 ## What it does
 
 ### Works in your project
@@ -40,17 +52,27 @@ The name comes from the Bosnian *kovač*, a smith: the one who forges and reshap
 - **Every session**, searchable, resumable, and yours to rename or delete.
 - **Version-matched docs.** It indexes the official documentation for the library versions your project actually uses (React Native, Expo, React, Next.js, Node.js, TypeScript, Laravel, PHP, WordPress, WooCommerce and any npm library with docs in its repo).
 
-<p align="center">
-  <img src="docs/assets/readme/app-memory.png" alt="The Memory view: preferences, decisions, conventions and research, each with its scope and source" width="900">
-</p>
+| What it remembers | The docs it reads |
+| --- | --- |
+| <img src="docs/assets/readme/app-memory.png" alt="The Memory view: preferences, decisions, conventions and research, each with its scope and source" width="440"> | <img src="docs/assets/readme/app-docs.png" alt="The Docs tab: documentation packs built for the exact library versions of a project" width="440"> |
 
 ### Builds things that hold up
 - **Web pages and landing pages.** The model supplies the content; a page builder renders a full page in one of four design directions, with a logo mark, motion, form validation and search-engine tags. With web access on, it finds stock photos under public-domain or attribution licences and writes the credits. The page is then opened in a headless browser at phone and desktop widths, and measured problems go back to the model. Facts only the owner knows are left as `[placeholders]`, never invented.
 - **React Native apps.** A new app is created with Expo's own generator, then an app kit adds the architecture: one API client with zod validation, TanStack Query, design tokens, accessible UI primitives, a folder per feature with list and detail screens, optional sign-in with the token in secure storage, navigation and EAS build profiles. Playbooks cover React Native, native iOS and Android, and building, signing and store submission. It prepares a release; you publish it.
 
-| A page from the page builder | An app from the app kit |
-| --- | --- |
-| <img src="docs/assets/readme/result-page.png" alt="A generated bakery landing page with placeholders for the owner's facts" width="430"> | <img src="docs/assets/readme/result-app.png" alt="Generated app screens: bookings, a list of barbers, a detail screen and the account tab" width="430"> |
+**An app from the app kit.** One request ("a barber booking app with sign-in, barbers and my bookings"): a look chosen from the kind of business, icons, rows that fade in and lean under the finger, stock photos for the sample data, and a detail screen with a hero image.
+
+<p align="center">
+  <img src="docs/assets/readme/result-app.png" alt="Generated app screens in a dark look: sign-in, a list of barbers with photos, a barber's detail screen with a hero image and facts, and the bookings list" width="900">
+</p>
+
+**A landing page from the page builder**, top to bottom as it was generated. Square brackets mark the facts only the owner knows.
+
+<p align="center">
+  <img src="docs/assets/readme/result-page.jpg" alt="A generated bakery landing page, full length: hero, product list, story, ordering steps, gallery, quote placeholder, questions, call to action and contact form" width="560">
+</p>
+
+The photos in both were found by the app itself; all are public domain (CC0) and listed in each project's `CREDITS.md`.
 
 ### Uses tools, with your say
 - **Terminal commands ask first.** "Allow for this session" covers commands of the same kind (`npx tsc …`) and says so on the button; anything that installs, deletes or publishes is asked about every time.
@@ -61,12 +83,10 @@ The name comes from the Bosnian *kovač*, a smith: the one who forges and reshap
 ## How it works
 
 <p align="center">
-  <img src="docs/assets/readme/how-it-works.svg" alt="A task goes through four stages: understand, work, verify and, after the session, learn. A failing check or a review finding goes back to work; memory feeds the next task." width="900">
+  <img src="docs/assets/readme/how-it-works.svg" alt="A task goes through understand, work and verify to an answer. A failing check or review finding goes back to work. After the session, what was learned goes into the knowledge kept on your Mac, which is retrieved for the next plan and searched again while working." width="900">
 </p>
 
-<p align="center">
-  <img src="docs/assets/readme/architecture.svg" alt="The desktop app holds the interface, the agent and the memory. The agent talks to a local model server and your project; memory uses SQLite. The web is reached only when you switch it on." width="900">
-</p>
+The retrieval step is what makes a mid-sized local model useful on a real project. Before planning, the task is matched against four stores (memories, past sessions, documentation packs and verified fixes) by keyword search and by meaning, the two rankings are merged, and only a small ranked slice goes into the prompt, each item with a citation. While working, the model can search the same stores again with `search_memory`, `search_docs` and `search_history`, and a failing command is answered together with the fix that worked for that error before.
 
 <details>
 <summary><b>The specifics, stage by stage</b></summary>
@@ -83,6 +103,26 @@ The name comes from the Bosnian *kovač*, a smith: the one who forges and reshap
 | Learn | When a session is finished or idle for ten minutes, at most five proposals are extracted, each with the message it rests on. A fix is kept only when the same check failed, files changed, and it passed in one session. |
 
 </details>
+
+## Architecture
+
+<p align="center">
+  <img src="docs/assets/readme/architecture.svg" alt="The desktop app holds the interface, the agent and the memory. The agent talks to a local model server and your project; memory uses SQLite. The web is reached only when you switch it on." width="900">
+</p>
+
+A pnpm monorepo. The four packages that make up the app depend on each other in one direction only:
+
+- **`memory-contract`** is the shared language: zod schemas and the `MemoryApi` type. The interface and the storage are built against it and never against each other, so either can be replaced or mocked.
+- **`memory-service`** owns the data. One SQLite database holds sessions, messages and tool calls (searchable with FTS5), memories with their history, documentation chunks and fixes; `sqlite-vec` adds vector search in the same file. It also runs the background jobs (proposing memories, summarising fixes, building docs packs), which pause while the agent works so one model is enough.
+- **`agent`** is the loop and everything it can do: the model client (any OpenAI-compatible server), tools, playbooks, the page builder and the app kit. It has no dependency on Electron, which is why the same loop runs in tests and evals against a scripted model.
+- **`desktop`** is the Electron shell. The main process hosts the agent and the memory, asks for approvals and renders pages off-screen for the visual check. The React interface runs without Node access and talks to the main process over a typed bridge.
+
+Design choices that follow from running locally:
+
+- **The model is a separate process** reached over HTTP on `127.0.0.1`, so it can be swapped or restarted without touching the app.
+- **Tools do the work the model is unreliable at.** Pages are rendered from structured content; project scaffolding comes from generators; edits are exact-match replacements that fail loudly.
+- **Trust boundaries are in code.** Commands, web access and screen control go through one approval path; secrets are found by a deterministic scanner before anything is stored; `.env` files are never read.
+- **Everything is testable without a model.** Recorded sessions replay against a scripted model, and the eval runner measures retrieval and extraction on public fixtures.
 
 ## What stays on your machine
 

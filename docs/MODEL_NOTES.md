@@ -24,6 +24,8 @@ What this model gets wrong when it drives the agent, and what the code does abou
 | Ends a run on an error line nothing returned (`API Error: 403 {"error":…}` after a failed edit) | A reply that is only an error line is not accepted as the answer; sent back once | `loop.ts` (`isErrorText`) |
 | Reads every file of a kit it was just given, one by one | The kit's result lists the parts with their props | `app-kit.ts` (`PARTS`) |
 | Spends turns filtering `tsc` output because a new Expo project never typechecks clean (the template's CSS imports and its unused web tab bar) | The app kit writes Expo's `expo-env.d.ts` and removes the tab bar it replaced, so `npx tsc --noEmit` exits 0 and the check means something | `app-kit.ts` |
+| Runs out of steps on a new app and stops with nothing to show for it | Kit-built apps get a larger step budget; at the limit the model is asked once, without tools, where things stand, and the user can reply "continue" | `loop.ts` |
+| Asked for a "modern design with icons, animations and photos", restyles screens by hand with uneven results | The app kit delivers them as parts: a look chosen from the kind of business, `Appear` and `Tilt` for motion, icons in headers and empty states, stock photos for the sample rows and a hero image on detail screens | `app-kit.ts` (`APP_LOOKS`, `motion.tsx`) |
 | Saves its answer to a file when asked a question and told not to change anything | File-writing tools are not offered for such requests | `loop.ts` (`isReadOnlyRequest`) |
 
 ## When adding a safeguard
