@@ -1,0 +1,95 @@
+# Packaging for Local Kovach: an unsigned (ad-hoc signed) DMG for Apple Silicon.
+# Build with `pnpm --filter @kovach-dev/desktop dist` or scripts/build-dmg.command.
+appId: dev.kovach.local
+productName: Local Kovach
+copyright: Copyright © 2026 Local Kovach contributors
+
+directories:
+  output: release
+
+# Local builds only: no auto-update feed.
+publish: null
+
+# electron-vite bundles the main, preload and renderer code (workspace packages
+# included) into out/. Only the npm packages that load native code at runtime
+# (better-sqlite3, sqlite-vec) are left in node_modules.
+files:
+  - out/**
+  # out/web is the browser preview build, not part of the app.
+  - "!out/web/**"
+  - package.json
+  # The binary in better-sqlite3/build is for Node; the app uses the Electron
+  # build from native/ (see extraResources) through the nativeBinding option.
+  - "!**/node_modules/better-sqlite3/{build,deps,src,docs,benchmark}/**"
+  - "!**/node_modules/**/*.{md,map,ts,cc,h,gyp,gypi}"
+  # Already bundled into out/ by electron-vite.
+  - "!**/node_modules/{@kovach-dev,react,react-dom,scheduler,zod}/**"
+
+# dlopen() can't read from inside app.asar, so native code must sit on disk in
+# app.asar.unpacked/.
+asarUnpack:
+  - "**/*.node"
+  - "**/node_modules/sqlite-vec-*/**"
+  # Tree-sitter's runtime and grammars, loaded as files by the code tools.
+  - "**/node_modules/@vscode/tree-sitter-wasm/wasm/**"
+
+# Contents/Resources/native/better_sqlite3.node, i.e.
+# join(process.resourcesPath, "native", "better_sqlite3.node").
+extraResources:
+  - from: native/better_sqlite3.node
+    to: native/better_sqlite3.node
+  # TypeScript's own type declarations (lib.es2022.d.ts and friends), which the
+  # code tools' type checking needs. The packager strips every .d.ts from
+  # node_modules whatever `files` says, so they ship as Resources/typescript-lib
+  # (the agent's code tools look there when they're missing next to typescript.js).
+  - from: node_modules/typescript/lib
+    to: typescript-lib
+    filter:
+      - "lib*.d.ts"
+
+# scripts/build-native.mjs already produced the Electron build of
+# better-sqlite3; rebuilding node_modules in place would break the Node build
+# the tests use.
+npmRebuild: false
+nodeGypRebuild: false
+
+mac:
+  target:
+    - target: dmg
+      arch: [arm64]
+  icon: ../../docs/assets/brand/AppIcon.icns
+  category: public.app-category.developer-tools
+  # No Developer ID certificate: sign ad hoc. Apple Silicon refuses to run
+  # code whose signature no longer matches, and packaging changes the Electron
+  # bundle, so the app must be re-signed; "-" does that without a certificate.
+  # Hardened runtime is off because ad-hoc signing plus library validation
+  # rejects the pre-signed Electron frameworks and the sqlite-vec dylib.
+  identity: "-"
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  notarize: false
+  darkModeSupport: true
+  extendInfo:
+    NSAppleEventsUsageDescription: Local Kovach controls other apps only when you turn on computer use and approve an action.
+    NSScreenCaptureUsageDescription: Local Kovach takes screenshots only when you turn on computer use, so the local model can see the screen.
+    NSAccessibilityUsageDescription: Local Kovach sends clicks and keystrokes only when you turn on computer use and approve an action.
+    NSDesktopFolderUsageDescription: Local Kovach reads and edits files in the project folders you open.
+    NSDocumentsFolderUsageDescription: Local Kovach reads and edits files in the project folders you open.
+    NSDownloadsFolderUsageDescription: Local Kovach reads and edits files in the project folders you open.
+
+dmg:
+  title: Local Kovach ${version}
+  artifactName: Local-Kovach-${version}-${arch}.${ext}
+  icon: ../../docs/assets/brand/AppIcon.icns
+  iconSize: 100
+  window:
+    width: 540
+    height: 380
+  contents:
+    - x: 140
+      y: 190
+      type: file
+    - x: 400
+      y: 190
+      type: link
+      path: /Applications

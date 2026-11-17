@@ -1,0 +1,48 @@
+{
+  "name": "@kovach-dev/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local Kovach desktop app (Electron)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "out/main/index.js",
+  "scripts": {
+    "native": "node scripts/build-native.mjs",
+    "predev": "node scripts/build-native.mjs --if-missing",
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "prestart": "node scripts/build-native.mjs --if-missing",
+    "start": "electron-vite preview",
+    "preview:web": "vite --config vite.web.config.ts",
+    "build:web": "vite build --config vite.web.config.ts",
+    "dist": "node scripts/build-native.mjs --if-missing && electron-vite build && electron-builder --mac --arm64 --publish never",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@kovach-dev/agent": "workspace:*",
+    "@kovach-dev/memory-contract": "workspace:*",
+    "@kovach-dev/memory-service": "workspace:*",
+    "@vscode/tree-sitter-wasm": "0.3.1",
+    "better-sqlite3": "^12.11.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "sqlite-vec": "^0.1.9",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.2.1",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "electron": "^42.11.18",
+    "electron-builder": "^26.18.0",
+    "electron-vite": "^6.0.0",
+    "jsdom": "^31.0.0",
+    "vite": "^8.3.6",
+    "vitest": "^3.2.7"
+  }
+}
