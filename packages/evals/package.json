@@ -1,0 +1,19 @@
+{
+  "name": "@kovach-dev/evals",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local Kovach eval runner: retrieval recall and extraction precision on recorded tasks",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "eval": "tsx --tsconfig tsconfig.json src/cli.ts"
+  },
+  "devDependencies": {
+    "@kovach-dev/agent": "workspace:*",
+    "@kovach-dev/memory-contract": "workspace:*",
+    "@kovach-dev/memory-service": "workspace:*",
+    "tsx": "^4.20.6"
+  }
+}

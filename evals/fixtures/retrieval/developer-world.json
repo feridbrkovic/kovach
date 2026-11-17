@@ -1,0 +1,1198 @@
+{
+  "kind": "retrieval",
+  "name": "developer-world",
+  "projects": [
+    {
+      "id": "eyewear-app",
+      "name": "eyewear-app",
+      "npm": {
+        "react-native": "0.77.1",
+        "expo": "52.0.11",
+        "zustand": "5.0.2",
+        "@tanstack/react-query": "5.62.0",
+        "react-native-svg": "15.8.0",
+        "react-native-vision-camera": "4.6.3"
+      }
+    },
+    {
+      "id": "optics-wp",
+      "name": "optics-wp",
+      "composer": {
+        "php": ">=8.1",
+        "wpackagist-plugin/woocommerce": "^9.4"
+      }
+    },
+    {
+      "id": "tax-api",
+      "name": "tax-api",
+      "composer": {
+        "php": "^8.3",
+        "laravel/framework": "^11.0",
+        "laravel/sanctum": "^4.0",
+        "pestphp/pest": "^3.0"
+      }
+    },
+    {
+      "id": "tryon-web",
+      "name": "tryon-web",
+      "npm": {
+        "next": "15.1.0",
+        "react": "19.0.0",
+        "three": "0.171.0",
+        "@react-three/fiber": "9.0.0",
+        "tailwindcss": "3.4.17"
+      }
+    },
+    {
+      "id": "orders-service",
+      "name": "orders-service",
+      "npm": {
+        "express": "5.0.1",
+        "pg": "8.13.1",
+        "pg-boss": "10.1.5",
+        "zod": "3.24.1",
+        "pino": "9.5.0",
+        "vitest": "2.1.8"
+      }
+    }
+  ],
+  "memories": [
+    {
+      "id": "g-pm",
+      "kind": "preference",
+      "key": "tooling.package-manager",
+      "body": "Use pnpm for JavaScript projects; never commit package-lock.json."
+    },
+    {
+      "id": "g-commits",
+      "kind": "preference",
+      "key": "git.commit-messages",
+      "body": "Commit messages are short, imperative and in English, without a scope prefix."
+    },
+    {
+      "id": "g-tests-first",
+      "kind": "preference",
+      "key": "workflow.bugfix-tests",
+      "body": "When fixing a bug, add a failing test first, then the fix."
+    },
+    {
+      "id": "g-lang",
+      "kind": "preference",
+      "key": "language.ui-copy",
+      "body": "Customer-facing UI copy is in Bosnian unless the project says otherwise; code and comments are in English."
+    },
+    {
+      "id": "g-ts-strict",
+      "kind": "preference",
+      "key": "typescript.strict",
+      "body": "New TypeScript code uses strict mode and no `any`; prefer `unknown` with a type guard."
+    },
+    {
+      "id": "g-format",
+      "kind": "preference",
+      "key": "style.formatting",
+      "body": "Prettier with 2-space indent, double quotes, trailing commas and print width 120."
+    },
+    {
+      "id": "g-dates",
+      "kind": "lesson",
+      "key": "dates.timezones",
+      "body": "Store timestamps in UTC and convert to Europe/Sarajevo only when displaying them."
+    },
+    {
+      "id": "g-money",
+      "kind": "lesson",
+      "key": "money.integers",
+      "body": "Keep money as integer minor units (cents, feninga) and format at the edge; floats drift in VAT math."
+    },
+    {
+      "id": "g-secrets",
+      "kind": "preference",
+      "key": "security.env",
+      "body": "Secrets live in .env files that are never committed; add each new variable to .env.example with a placeholder."
+    },
+    {
+      "id": "g-review",
+      "kind": "preference",
+      "key": "review.small-changes",
+      "body": "Keep changes small: one concern per pull request, under about 300 changed lines."
+    },
+    {
+      "id": "g-a11y",
+      "kind": "lesson",
+      "key": "a11y.touch-targets",
+      "body": "Touch targets are at least 44×44 points on iOS and 48×48 dp on Android."
+    },
+    {
+      "id": "g-images",
+      "kind": "lesson",
+      "key": "web.images",
+      "body": "Serve product images as WebP or AVIF with explicit width and height so the layout doesn't shift while they load."
+    },
+    {
+      "id": "g-retry",
+      "kind": "lesson",
+      "key": "http.retries",
+      "body": "Retry only idempotent requests, with exponential backoff and jitter, at most 3 times; never retry a payment capture blindly."
+    },
+    {
+      "id": "g-deps",
+      "kind": "preference",
+      "key": "deps.new",
+      "body": "Ask before adding a new runtime dependency; prefer the platform or what the project already uses."
+    },
+    {
+      "id": "e-state",
+      "kind": "decision",
+      "key": "state.library",
+      "body": "Global state lives in Zustand stores under src/stores; server data goes through React Query and never into Zustand.",
+      "project": "eyewear-app"
+    },
+    {
+      "id": "e-nav",
+      "kind": "decision",
+      "key": "navigation",
+      "body": "Navigation uses Expo Router with file-based routes in app/; the tabs are Shop, Try-on, Cart and Account.",
+      "project": "eyewear-app"
+    },
+    {
+      "id": "e-api",
+      "kind": "convention",
+      "key": "api.client",
+      "body": "All HTTP calls go through src/api/client.ts, a fetch wrapper that adds the auth token and base URL; screens never call fetch directly.",
+      "project": "eyewear-app"
+    },
+    {
+      "id": "e-styles",
+      "kind": "convention",
+      "key": "styling",
+      "body": "Styles use StyleSheet.create at the bottom of each file; colors and spacing come from src/theme/tokens.ts.",
+      "project": "eyewear-app"
+    },
+    {
+      "id": "e-lists",
+      "kind": "lesson",
+      "key": "lists.flashlist",
+      "body": "Product grids use FlashList with estimatedItemSize; FlatList stuttered with 500+ frame thumbnails.",
+      "project": "eyewear-app"
+    },
+    {
+      "id": "e-images",
+      "kind": "decision",
+      "key": "images.cache",
+      "body": "Product photos load through expo-image with a disk cache policy; the CDN serves them resized to 3x.",
+      "project": "eyewear-app"
+    },
+    {
+      "id": "e-cart",
+      "kind": "decision",
+      "key": "cart.persistence",
+      "body": "The cart is persisted with the zustand persist middleware to AsyncStorage under the key cart-v2.",
+      "project": "eyewear-app"
+    },
+    {
+      "id": "e-env",
+      "kind": "convention",
+      "key": "config.env",
+      "body": "Public config uses EXPO_PUBLIC_ variables read in app.config.ts; nothing secret ships inside the app.",
+      "project": "eyewear-app"
+    },
+    {
+      "id": "e-release",
+      "kind": "decision",
+      "key": "release.eas",
+      "body": "Builds go through EAS: the preview profile (internal distribution) for testers, the production profile for the stores; OTA updates go to the production channel only after QA.",
+      "project": "eyewear-app"
+    },
+    {
+      "id": "e-tests",
+      "kind": "convention",
+      "key": "testing",
+      "body": "Component tests use React Native Testing Library with jest-expo; query by role or label, and use testID only when nothing else works.",
+      "project": "eyewear-app"
+    },
+    {
+      "id": "e-tryon",
+      "kind": "decision",
+      "key": "tryon.camera",
+      "body": "Try-on uses react-native-vision-camera with a frame processor for face landmarks; Expo Camera was too slow.",
+      "project": "eyewear-app"
+    },
+    {
+      "id": "e-push",
+      "kind": "open_issue",
+      "key": "push.android",
+      "body": "Push notifications don't arrive on some Xiaomi devices when the app is killed; battery optimization is the suspect.",
+      "project": "eyewear-app"
+    },
+    {
+      "id": "e-i18n",
+      "kind": "convention",
+      "key": "i18n",
+      "body": "Strings live in src/i18n/bs.json and en.json through i18next; keys are screen.element, for example cart.checkoutButton.",
+      "project": "eyewear-app"
+    },
+    {
+      "id": "e-payments",
+      "kind": "decision",
+      "key": "payments",
+      "body": "Card payments go through the web checkout in an in-app browser (expo-web-browser); there is no native payment SDK.",
+      "project": "eyewear-app"
+    },
+    {
+      "id": "w-theme",
+      "kind": "decision",
+      "key": "theme.child",
+      "body": "Customizations live in a child theme of Storefront (optics-child); the parent theme is never edited.",
+      "project": "optics-wp"
+    },
+    {
+      "id": "w-plugin",
+      "kind": "convention",
+      "key": "code.site-plugin",
+      "body": "Business logic goes in the site plugin wp-content/plugins/optics-core, not in functions.php.",
+      "project": "optics-wp"
+    },
+    {
+      "id": "w-hooks",
+      "kind": "convention",
+      "key": "hooks.prefix",
+      "body": "All hooks, functions and options are prefixed optics_ to avoid clashes with other plugins.",
+      "project": "optics-wp"
+    },
+    {
+      "id": "w-lens",
+      "kind": "decision",
+      "key": "product.lens-options",
+      "body": "Lens options (index, coating, tint) are WooCommerce product add-ons, priced per option and stored as order item meta.",
+      "project": "optics-wp"
+    },
+    {
+      "id": "w-prescription",
+      "kind": "decision",
+      "key": "prescription.upload",
+      "body": "Customers upload prescriptions as PDF or JPG on the product page; files go to a non-public folder and are served through a signed download link.",
+      "project": "optics-wp"
+    },
+    {
+      "id": "w-cache",
+      "kind": "decision",
+      "key": "perf.cache",
+      "body": "Pages are cached with LiteSpeed Cache; cart, checkout and my-account are excluded.",
+      "project": "optics-wp"
+    },
+    {
+      "id": "w-deploy",
+      "kind": "decision",
+      "key": "deploy",
+      "body": "Deploys go over SFTP from GitHub Actions to cPanel; the database is never pushed, only pulled down to staging.",
+      "project": "optics-wp"
+    },
+    {
+      "id": "w-staging",
+      "kind": "convention",
+      "key": "staging",
+      "body": "Changes are tried on the staging site first; after pulling the database, run a WP-CLI search-replace for the URL.",
+      "project": "optics-wp"
+    },
+    {
+      "id": "w-sanitize",
+      "kind": "convention",
+      "key": "security.sanitize",
+      "body": "Sanitize every input with sanitize_text_field or absint, escape output with esc_html or esc_attr, and put a nonce on every form.",
+      "project": "optics-wp"
+    },
+    {
+      "id": "w-email",
+      "kind": "lesson",
+      "key": "email.smtp",
+      "body": "Order emails went to spam until mail was sent through the provider's SMTP with SPF and DKIM set up (WP Mail SMTP).",
+      "project": "optics-wp"
+    },
+    {
+      "id": "w-tax",
+      "kind": "decision",
+      "key": "tax.vat",
+      "body": "Prices are entered including 17% VAT and shown including tax in the shop and the cart.",
+      "project": "optics-wp"
+    },
+    {
+      "id": "w-shipping",
+      "kind": "decision",
+      "key": "shipping",
+      "body": "Shipping is free over 100 KM, otherwise a flat 7 KM by courier; pickup in the store is free.",
+      "project": "optics-wp"
+    },
+    {
+      "id": "w-seo",
+      "kind": "convention",
+      "key": "seo",
+      "body": "Product titles follow 'Brand Model – Frame colour'; meta descriptions are written by hand for the top 50 products.",
+      "project": "optics-wp"
+    },
+    {
+      "id": "t-arch",
+      "kind": "decision",
+      "key": "architecture",
+      "body": "Controllers stay thin: validation in Form Requests, logic in service classes under app/Services, repositories only for complex queries.",
+      "project": "tax-api"
+    },
+    {
+      "id": "t-auth",
+      "kind": "decision",
+      "key": "auth",
+      "body": "The API uses Laravel Sanctum personal access tokens; the web dashboard uses session cookies.",
+      "project": "tax-api"
+    },
+    {
+      "id": "t-queue",
+      "kind": "decision",
+      "key": "queues",
+      "body": "Long work (PDF parsing, model calls) runs on Redis queues with Horizon, never inside a request.",
+      "project": "tax-api"
+    },
+    {
+      "id": "t-llm",
+      "kind": "decision",
+      "key": "answers.citations",
+      "body": "Tax answers are generated by the model from retrieved law excerpts, and every answer cites the article it used.",
+      "project": "tax-api"
+    },
+    {
+      "id": "t-tests",
+      "kind": "convention",
+      "key": "testing",
+      "body": "Feature tests use Pest with RefreshDatabase on in-memory SQLite; outside HTTP calls are faked with Http::fake().",
+      "project": "tax-api"
+    },
+    {
+      "id": "t-money",
+      "kind": "convention",
+      "key": "money",
+      "body": "Amounts are stored as integer feninga in BIGINT columns and cast to a Money value object.",
+      "project": "tax-api"
+    },
+    {
+      "id": "t-migrations",
+      "kind": "convention",
+      "key": "migrations",
+      "body": "Migrations are never edited after merge; add a new one. Columns are snake_case and foreign keys constrained.",
+      "project": "tax-api"
+    },
+    {
+      "id": "t-errors",
+      "kind": "convention",
+      "key": "api.errors",
+      "body": "API errors are JSON problem details (type, title, status, detail); validation errors keep Laravel's 422 shape.",
+      "project": "tax-api"
+    },
+    {
+      "id": "t-rates",
+      "kind": "decision",
+      "key": "tax.rules",
+      "body": "Tax rates and thresholds live in the tax_rules table keyed by year, not in config files.",
+      "project": "tax-api"
+    },
+    {
+      "id": "t-docs",
+      "kind": "research",
+      "key": "laws.source",
+      "body": "Official law texts come from the Official Gazette PDFs; scanned ones need OCR before chunking.",
+      "project": "tax-api"
+    },
+    {
+      "id": "t-deploy",
+      "kind": "decision",
+      "key": "deploy",
+      "body": "Deploys go through Laravel Forge to one VPS with zero-downtime releases; maintenance mode only for migrations that lock tables.",
+      "project": "tax-api"
+    },
+    {
+      "id": "t-pdf",
+      "kind": "lesson",
+      "key": "pdf.memory",
+      "body": "Parsing large PDFs with smalot/pdfparser ran out of memory; process them page by page in a queued job.",
+      "project": "tax-api"
+    },
+    {
+      "id": "t-locale",
+      "kind": "convention",
+      "key": "api.dates",
+      "body": "Dates in API responses are ISO 8601 in UTC; number formatting is left to the client.",
+      "project": "tax-api"
+    },
+    {
+      "id": "n-router",
+      "kind": "decision",
+      "key": "routing",
+      "body": "App Router only: server components by default, 'use client' only for the 3D viewer and interactive forms.",
+      "project": "tryon-web"
+    },
+    {
+      "id": "n-3d",
+      "kind": "decision",
+      "key": "tryon.engine",
+      "body": "The try-on viewer uses three.js through @react-three/fiber; glasses models are Draco-compressed glTF files under 1 MB each.",
+      "project": "tryon-web"
+    },
+    {
+      "id": "n-face",
+      "kind": "decision",
+      "key": "tryon.tracking",
+      "body": "Face tracking runs in the browser with MediaPipe Face Landmarker (WASM); no camera video leaves the device.",
+      "project": "tryon-web"
+    },
+    {
+      "id": "n-styling",
+      "kind": "convention",
+      "key": "styling",
+      "body": "Tailwind only, no CSS modules; design tokens in tailwind.config.ts and component variants with cva.",
+      "project": "tryon-web"
+    },
+    {
+      "id": "n-data",
+      "kind": "convention",
+      "key": "data.fetching",
+      "body": "Data is fetched in server components with fetch and revalidation tags; client components receive it as props.",
+      "project": "tryon-web"
+    },
+    {
+      "id": "n-auth",
+      "kind": "decision",
+      "key": "auth",
+      "body": "The SaaS dashboard signs in with Auth.js email magic links; organizations own the API keys for the embed widget.",
+      "project": "tryon-web"
+    },
+    {
+      "id": "n-embed",
+      "kind": "decision",
+      "key": "embed.widget",
+      "body": "Shops embed try-on with a script tag that mounts an iframe; the iframe and the host page talk through postMessage with origin checks.",
+      "project": "tryon-web"
+    },
+    {
+      "id": "n-deploy",
+      "kind": "decision",
+      "key": "deploy",
+      "body": "Hosted on Vercel: a preview deployment per pull request, production from main.",
+      "project": "tryon-web"
+    },
+    {
+      "id": "n-perf",
+      "kind": "lesson",
+      "key": "perf.wasm",
+      "body": "Load the MediaPipe WASM and model lazily when the user opens try-on, not on page load; LCP dropped from 4.1 s to 1.9 s.",
+      "project": "tryon-web"
+    },
+    {
+      "id": "n-tests",
+      "kind": "convention",
+      "key": "testing",
+      "body": "Playwright covers the embed flow end to end; Vitest covers utilities.",
+      "project": "tryon-web"
+    },
+    {
+      "id": "n-env",
+      "kind": "convention",
+      "key": "config.env",
+      "body": "Server-only secrets never get the NEXT_PUBLIC_ prefix; env is validated at startup with a zod schema in src/env.ts.",
+      "project": "tryon-web"
+    },
+    {
+      "id": "n-pricing",
+      "kind": "decision",
+      "key": "billing",
+      "body": "Billing uses Stripe subscriptions (Starter, Growth, Enterprise) with usage counted per try-on session.",
+      "project": "tryon-web"
+    },
+    {
+      "id": "n-i18n",
+      "kind": "open_issue",
+      "key": "i18n",
+      "body": "The dashboard is English only; Bosnian and German translations are planned but not started.",
+      "project": "tryon-web"
+    },
+    {
+      "id": "o-db",
+      "kind": "decision",
+      "key": "database",
+      "body": "PostgreSQL 16 through node-postgres; SQL is written by hand in src/db/queries, no ORM.",
+      "project": "orders-service"
+    },
+    {
+      "id": "o-migrations",
+      "kind": "convention",
+      "key": "migrations",
+      "body": "Schema changes are node-pg-migrate migrations in migrations/, one per change, never edited after deploy.",
+      "project": "orders-service"
+    },
+    {
+      "id": "o-validation",
+      "kind": "convention",
+      "key": "validation",
+      "body": "Every request body is validated with a zod schema in the route file; invalid input returns 400 with the zod issues.",
+      "project": "orders-service"
+    },
+    {
+      "id": "o-errors",
+      "kind": "convention",
+      "key": "errors",
+      "body": "Errors bubble to one Express error handler that logs with pino and answers {error: {code, message}}.",
+      "project": "orders-service"
+    },
+    {
+      "id": "o-sync",
+      "kind": "decision",
+      "key": "sync.woocommerce",
+      "body": "Orders from the WooCommerce shop arrive by webhook; the handler verifies the signature and enqueues, a worker writes to Postgres.",
+      "project": "orders-service"
+    },
+    {
+      "id": "o-idempotency",
+      "kind": "lesson",
+      "key": "webhooks.idempotency",
+      "body": "WooCommerce retries webhooks: store the delivery id and ignore repeats, or orders get created twice.",
+      "project": "orders-service"
+    },
+    {
+      "id": "o-jobs",
+      "kind": "decision",
+      "key": "jobs",
+      "body": "Background jobs use pg-boss on the same Postgres instead of Redis.",
+      "project": "orders-service"
+    },
+    {
+      "id": "o-tests",
+      "kind": "convention",
+      "key": "testing",
+      "body": "Integration tests run against a throwaway Postgres (testcontainers); unit tests mock nothing but the clock.",
+      "project": "orders-service"
+    },
+    {
+      "id": "o-logging",
+      "kind": "convention",
+      "key": "logging",
+      "body": "Log JSON with pino and never log request bodies of payment or customer endpoints.",
+      "project": "orders-service"
+    },
+    {
+      "id": "o-deploy",
+      "kind": "decision",
+      "key": "deploy",
+      "body": "Runs in Docker on the shop's VPS; GitHub Actions deploys with docker compose pull and up -d.",
+      "project": "orders-service"
+    },
+    {
+      "id": "o-esm",
+      "kind": "decision",
+      "key": "modules",
+      "body": "The service is ESM only (type: module) and imports include the .js extension.",
+      "project": "orders-service"
+    },
+    {
+      "id": "o-auth",
+      "kind": "decision",
+      "key": "auth",
+      "body": "Internal calls are signed with a shared HMAC header; this service has no user accounts.",
+      "project": "orders-service"
+    }
+  ],
+  "episodes": [
+    {
+      "id": "ep-svg",
+      "project": "eyewear-app",
+      "problem": "The try-on screen crashed after adding react-native-svg.",
+      "error": "Invariant Violation: requireNativeComponent: \"RNSVGPath\" was not found in the UIManager.\n\nThis error is located at:\n    in RNSVGPath\n    in FrameOutline (at src/screens/TryOn.tsx:42)",
+      "fix": "Rebuilt the development client after installing react-native-svg (expo prebuild and a new EAS development build); the installed client didn't have the native module.",
+      "lesson": "A 'was not found in the UIManager' error right after adding a native package means the installed app predates it: rebuild the native app or development client.",
+      "verifiedBy": "run"
+    },
+    {
+      "id": "ep-metro",
+      "project": "eyewear-app",
+      "problem": "Metro couldn't resolve imports that use the @ alias.",
+      "error": "error: Error: Unable to resolve module @/theme/tokens from /Users/f/eyewear-app/src/components/PriceTag.tsx: @/theme/tokens could not be found within the project or in these directories:\n  node_modules",
+      "fix": "Added the @ alias to babel.config.js (babel-plugin-module-resolver) to match the tsconfig paths, then cleared the Metro cache with expo start -c.",
+      "lesson": "Path aliases have to be configured for Metro (babel module-resolver) as well as TypeScript; clear the Metro cache after changing them.",
+      "verifiedBy": "run"
+    },
+    {
+      "id": "ep-pods",
+      "project": "eyewear-app",
+      "problem": "pod install failed after adding VisionCamera.",
+      "error": "[!] CocoaPods could not find compatible versions for pod \"VisionCamera\":\n  In Podfile:\n    VisionCamera (from `../node_modules/react-native-vision-camera`)\n\nSpecs satisfying the `VisionCamera` dependency were found, but they required a higher minimum deployment target.",
+      "fix": "Raised the iOS deployment target to 15.1 with expo-build-properties in app.config.ts and ran pod install again.",
+      "lesson": "When CocoaPods says a pod requires a higher minimum deployment target, raise the iOS deployment target (expo-build-properties in Expo) instead of pinning an older pod.",
+      "verifiedBy": "build"
+    },
+    {
+      "id": "ep-undef-map",
+      "project": "eyewear-app",
+      "problem": "The product grid crashed while products were loading.",
+      "error": "TypeError: Cannot read property 'map' of undefined\n    at ProductGrid (src/components/ProductGrid.tsx:18:25)",
+      "fix": "Defaulted products to an empty array while the React Query request is loading (data ?? []).",
+      "lesson": "Default query data to an empty array before mapping it; React Query returns undefined until the first fetch completes.",
+      "verifiedBy": "test"
+    },
+    {
+      "id": "ep-wc-bool",
+      "project": "optics-wp",
+      "problem": "The cart crashed with a fatal error for a deleted product.",
+      "error": "PHP Fatal error:  Uncaught Error: Call to a member function get_price() on bool in /home/optics/public_html/wp-content/plugins/optics-core/includes/lens-pricing.php:57",
+      "fix": "wc_get_product() returns false for deleted products; return early when the product is missing before reading its price.",
+      "lesson": "wc_get_product() returns false for missing or deleted products: check the result before calling methods on it.",
+      "verifiedBy": "run"
+    },
+    {
+      "id": "ep-memory",
+      "project": "optics-wp",
+      "problem": "The product export ran out of memory.",
+      "error": "PHP Fatal error:  Allowed memory size of 268435456 bytes exhausted (tried to allocate 20480 bytes) in /home/optics/public_html/wp-includes/class-wpdb.php on line 2187",
+      "fix": "The export loaded every order at once; switched to wc_get_orders with paged batches of 200.",
+      "lesson": "When a WordPress export or loop exhausts the allowed memory size, page through records in batches instead of raising memory_limit.",
+      "verifiedBy": "run"
+    },
+    {
+      "id": "ep-nonce",
+      "project": "optics-wp",
+      "problem": "The prescription upload form failed with an expired link message on cached pages.",
+      "error": "The link you followed has expired. Please try again.",
+      "fix": "LiteSpeed cached the product page with a stale nonce; the form now fetches a fresh nonce with AJAX before submitting.",
+      "lesson": "'The link you followed has expired' on a cached page is a stale nonce: fetch the nonce with AJAX or keep the form out of the page cache.",
+      "verifiedBy": "run"
+    },
+    {
+      "id": "ep-sqlstate",
+      "project": "tax-api",
+      "problem": "A query still used a renamed column.",
+      "error": "SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tax_year' in 'where clause' (Connection: mysql, SQL: select * from `tax_rules` where `tax_year` = 2026)",
+      "fix": "The column became year in a new migration but TaxRule::scopeForYear still used tax_year; updated the scope.",
+      "lesson": "After renaming a column, search query scopes and raw where clauses for the old name; SQLite tests only catch it if they hit that query.",
+      "verifiedBy": "test"
+    },
+    {
+      "id": "ep-sanctum",
+      "project": "tax-api",
+      "problem": "Token tests failed in a fresh Laravel 11 app.",
+      "error": "Illuminate\\Database\\QueryException: SQLSTATE[HY000]: General error: 1 no such table: personal_access_tokens (Connection: sqlite, SQL: insert into \"personal_access_tokens\" (\"name\", \"token\") values (api, 8f2c))",
+      "fix": "Sanctum's migration wasn't published; ran php artisan install:api, which installs Sanctum and publishes it.",
+      "lesson": "In Laravel 11, 'no such table: personal_access_tokens' means Sanctum isn't installed yet: run php artisan install:api.",
+      "verifiedBy": "test"
+    },
+    {
+      "id": "ep-queue",
+      "project": "tax-api",
+      "problem": "The law PDF parsing job kept failing after retries.",
+      "error": "Illuminate\\Queue\\MaxAttemptsExceededException: App\\Jobs\\ParseLawPdf has been attempted too many times.",
+      "fix": "The job ran longer than retry_after (90 s), so a worker picked it up again; set timeout 600 and retry_after 660 on the pdf queue.",
+      "lesson": "MaxAttemptsExceededException on a long job usually means retry_after is shorter than the job's runtime; keep the job timeout below retry_after.",
+      "verifiedBy": "run"
+    },
+    {
+      "id": "ep-hydration",
+      "project": "tryon-web",
+      "problem": "The price badge caused a hydration error.",
+      "error": "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client.\n  at PriceBadge (src/components/PriceBadge.tsx:12:9)",
+      "fix": "The badge used toLocaleString(), which differs between Node and the browser; the price is now formatted on the server with Intl.NumberFormat('bs-BA') and passed down as a string.",
+      "lesson": "Hydration mismatches often come from number or date formatting that differs between server and browser: format on the server or use a fixed locale.",
+      "verifiedBy": "build"
+    },
+    {
+      "id": "ep-window",
+      "project": "tryon-web",
+      "problem": "The 3D viewer broke the build.",
+      "error": "ReferenceError: window is not defined\n    at Viewer (src/components/TryOnViewer.tsx:8:3)",
+      "fix": "Loaded the viewer with next/dynamic and ssr: false.",
+      "lesson": "'window is not defined' in Next.js means browser-only code ran on the server: load that component with next/dynamic and ssr: false, or touch window inside useEffect.",
+      "verifiedBy": "build"
+    },
+    {
+      "id": "ep-postmessage",
+      "project": "tryon-web",
+      "problem": "The embedded widget couldn't read the host page.",
+      "error": "SecurityError: Failed to read a named property 'document' from 'Window': Blocked a frame with origin \"https://tryon.example\" from accessing a cross-origin frame.",
+      "fix": "Replaced direct access to the parent window with postMessage and an origin check on both sides.",
+      "lesson": "Cross-origin iframes can't touch each other's DOM: talk through postMessage and check event.origin on both sides.",
+      "verifiedBy": "run"
+    },
+    {
+      "id": "ep-pg-refused",
+      "project": "orders-service",
+      "problem": "The worker container couldn't reach Postgres.",
+      "error": "Error: connect ECONNREFUSED 127.0.0.1:5432\n    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)",
+      "fix": "Inside Docker the database host is the compose service name (db), not localhost; DATABASE_URL was updated for the container.",
+      "lesson": "ECONNREFUSED to localhost from inside a container: localhost is the container itself, so use the compose service name or host.docker.internal.",
+      "verifiedBy": "run"
+    },
+    {
+      "id": "ep-esm",
+      "project": "orders-service",
+      "problem": "A seed script failed to import an ESM-only package.",
+      "error": "Error [ERR_REQUIRE_ESM]: require() of ES Module /app/node_modules/node-fetch/src/index.js from /app/scripts/seed.cjs not supported.",
+      "fix": "Converted the seed script to ESM (.mjs with import) instead of pinning node-fetch 2.",
+      "lesson": "ERR_REQUIRE_ESM means the package is ESM-only: switch the caller to import (or a dynamic import()) instead of downgrading the package.",
+      "verifiedBy": "run"
+    },
+    {
+      "id": "ep-webhook-sig",
+      "project": "orders-service",
+      "problem": "Every WooCommerce webhook was rejected as invalid.",
+      "error": "Error: webhook signature mismatch\n    at verifyWoo (src/webhooks/woo.ts:31:11)",
+      "fix": "WooCommerce signs the raw body but express.json() had already parsed it; the webhook route now uses express.raw() and the HMAC is computed over the buffer.",
+      "lesson": "Verify webhook HMAC signatures over the raw request body; a JSON body parser changes the bytes.",
+      "verifiedBy": "test"
+    }
+  ],
+  "questions": [
+    {
+      "id": "rn-wishlist-store",
+      "stack": "rn",
+      "text": "Where should the new wishlist state live, and how do I keep the API data out of it?",
+      "expect": [
+        "e-state"
+      ],
+      "project": "eyewear-app"
+    },
+    {
+      "id": "rn-grid-lag",
+      "stack": "rn",
+      "text": "The product grid lags when scrolling through all the frames. What did we use for big lists?",
+      "expect": [
+        "e-lists"
+      ],
+      "project": "eyewear-app"
+    },
+    {
+      "id": "rn-favorites-call",
+      "stack": "rn",
+      "text": "Call the new /favorites endpoint from the wishlist screen.",
+      "expect": [
+        "e-api"
+      ],
+      "project": "eyewear-app"
+    },
+    {
+      "id": "rn-svg-crash",
+      "stack": "rn",
+      "text": "The lens picker screen crashes since I added a new icon.",
+      "expect": [
+        "ep-svg"
+      ],
+      "project": "eyewear-app",
+      "errorOutput": "Invariant Violation: requireNativeComponent: \"RNSVGPath\" was not found in the UIManager.\n\nThis error is located at:\n    in RNSVGPath\n    in LensPreview (at src/screens/LensPicker.tsx:77)"
+    },
+    {
+      "id": "rn-testers-build",
+      "stack": "rn",
+      "text": "Get a build to the testers.",
+      "expect": [
+        "e-release"
+      ],
+      "project": "eyewear-app"
+    },
+    {
+      "id": "rn-translate-label",
+      "stack": "rn",
+      "text": "Translate the label on the new checkout button.",
+      "expect": [
+        "e-i18n"
+      ],
+      "project": "eyewear-app"
+    },
+    {
+      "id": "rn-xiaomi",
+      "stack": "rn",
+      "text": "Some Android customers never get the 'order shipped' notification.",
+      "expect": [
+        "e-push"
+      ],
+      "project": "eyewear-app"
+    },
+    {
+      "id": "rn-metro-alias",
+      "stack": "rn",
+      "text": "Metro can't find my new hook import.",
+      "expect": [
+        "ep-metro"
+      ],
+      "project": "eyewear-app",
+      "errorOutput": "error: Error: Unable to resolve module @/hooks/useCart from /Users/f/eyewear-app/app/(tabs)/cart.tsx: @/hooks/useCart could not be found within the project or in these directories:\n  node_modules"
+    },
+    {
+      "id": "rn-pods",
+      "stack": "rn",
+      "text": "pod install complains that VisionCamera needs a newer iOS minimum.",
+      "expect": [
+        "ep-pods"
+      ],
+      "project": "eyewear-app"
+    },
+    {
+      "id": "rn-camera-slow",
+      "stack": "rn",
+      "text": "The try-on camera preview is slow. Which camera library are we on?",
+      "expect": [
+        "e-tryon"
+      ],
+      "project": "eyewear-app"
+    },
+    {
+      "id": "rn-orders-crash",
+      "stack": "rn",
+      "text": "The orders list crashes while it's loading.",
+      "expect": [
+        "ep-undef-map"
+      ],
+      "project": "eyewear-app",
+      "errorOutput": "TypeError: Cannot read property 'map' of undefined\n    at OrdersList (src/screens/Orders.tsx:31:19)"
+    },
+    {
+      "id": "wp-pd-field",
+      "stack": "php",
+      "text": "Add a pupillary distance field to the glasses product page.",
+      "expect": [
+        "w-lens",
+        "w-plugin"
+      ],
+      "project": "optics-wp"
+    },
+    {
+      "id": "wp-checkout-field",
+      "stack": "php",
+      "text": "Where do I put the code for a new custom checkout field?",
+      "expect": [
+        "w-plugin",
+        "w-hooks"
+      ],
+      "project": "optics-wp"
+    },
+    {
+      "id": "wp-cart-fatal",
+      "stack": "php",
+      "text": "The cart page goes white after a product is removed from the catalogue.",
+      "expect": [
+        "ep-wc-bool"
+      ],
+      "project": "optics-wp",
+      "errorOutput": "PHP Fatal error:  Uncaught Error: Call to a member function get_price() on bool in /home/optics/public_html/wp-content/plugins/optics-core/includes/cart-upsell.php:112"
+    },
+    {
+      "id": "wp-spam",
+      "stack": "php",
+      "text": "Customers say their order confirmation emails end up in junk.",
+      "expect": [
+        "w-email"
+      ],
+      "project": "optics-wp"
+    },
+    {
+      "id": "wp-go-live",
+      "stack": "php",
+      "text": "Put the new header changes on the live site.",
+      "expect": [
+        "w-deploy",
+        "w-staging"
+      ],
+      "project": "optics-wp"
+    },
+    {
+      "id": "wp-expired-link",
+      "stack": "php",
+      "text": "The prescription upload form says the link has expired.",
+      "expect": [
+        "ep-nonce"
+      ],
+      "project": "optics-wp",
+      "errorOutput": "The link you followed has expired. Please try again."
+    },
+    {
+      "id": "wp-shipping",
+      "stack": "php",
+      "text": "How much is delivery, and when is it free?",
+      "expect": [
+        "w-shipping"
+      ],
+      "project": "optics-wp"
+    },
+    {
+      "id": "wp-export-memory",
+      "stack": "php",
+      "text": "The order export runs out of memory.",
+      "expect": [
+        "ep-memory"
+      ],
+      "project": "optics-wp",
+      "errorOutput": "PHP Fatal error:  Allowed memory size of 268435456 bytes exhausted (tried to allocate 65536 bytes) in /home/optics/public_html/wp-content/plugins/optics-core/includes/export.php on line 88"
+    },
+    {
+      "id": "lv-history-endpoint",
+      "stack": "php",
+      "text": "Add an endpoint that returns the user's past tax calculations.",
+      "expect": [
+        "t-arch",
+        "t-auth"
+      ],
+      "project": "tax-api"
+    },
+    {
+      "id": "lv-unknown-column",
+      "stack": "php",
+      "text": "The test for the rules endpoint fails with an unknown column.",
+      "expect": [
+        "ep-sqlstate"
+      ],
+      "project": "tax-api",
+      "errorOutput": "SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tax_year' in 'where clause' (Connection: mysql, SQL: select * from `tax_rules` where `tax_year` = 2026)"
+    },
+    {
+      "id": "lv-pdf-retries",
+      "stack": "php",
+      "text": "The job that parses the new gazette PDF keeps getting retried and then fails.",
+      "expect": [
+        "ep-queue",
+        "t-pdf"
+      ],
+      "project": "tax-api",
+      "errorOutput": "Illuminate\\Queue\\MaxAttemptsExceededException: App\\Jobs\\ParseLawPdf has been attempted too many times."
+    },
+    {
+      "id": "lv-deductions-amounts",
+      "stack": "php",
+      "text": "How should I store the deduction amounts in the new table?",
+      "expect": [
+        "t-money",
+        "g-money"
+      ],
+      "project": "tax-api"
+    },
+    {
+      "id": "lv-sanctum-fresh",
+      "stack": "php",
+      "text": "Fresh Laravel 11 app: the token tests fail on a missing table.",
+      "expect": [
+        "ep-sanctum"
+      ],
+      "errorOutput": "Illuminate\\Database\\QueryException: SQLSTATE[HY000]: General error: 1 no such table: personal_access_tokens (Connection: sqlite, SQL: insert into \"personal_access_tokens\" (\"name\", \"token\") values (cli, 1a2b))"
+    },
+    {
+      "id": "lv-thresholds",
+      "stack": "php",
+      "text": "Where do the VAT thresholds for 2027 go?",
+      "expect": [
+        "t-rates"
+      ],
+      "project": "tax-api"
+    },
+    {
+      "id": "js-cancel-endpoint",
+      "stack": "js",
+      "text": "Add an endpoint to cancel an order.",
+      "expect": [
+        "o-validation",
+        "o-errors"
+      ],
+      "project": "orders-service"
+    },
+    {
+      "id": "js-duplicates",
+      "stack": "js",
+      "text": "Orders from the shop sometimes show up twice.",
+      "expect": [
+        "o-idempotency"
+      ],
+      "project": "orders-service"
+    },
+    {
+      "id": "js-db-refused",
+      "stack": "js",
+      "text": "The worker container can't reach the database.",
+      "expect": [
+        "ep-pg-refused"
+      ],
+      "project": "orders-service",
+      "errorOutput": "Error: connect ECONNREFUSED 127.0.0.1:5432\n    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1607:16)"
+    },
+    {
+      "id": "js-reminder-job",
+      "stack": "js",
+      "text": "Send a reminder email two days after an order ships, in the background.",
+      "expect": [
+        "o-jobs"
+      ],
+      "project": "orders-service"
+    },
+    {
+      "id": "js-refund-test",
+      "stack": "js",
+      "text": "Write a test for the refund query.",
+      "expect": [
+        "o-tests"
+      ],
+      "project": "orders-service"
+    },
+    {
+      "id": "js-webhook-invalid",
+      "stack": "js",
+      "text": "The webhook handler rejects every request from WooCommerce as invalid.",
+      "expect": [
+        "ep-webhook-sig"
+      ],
+      "project": "orders-service",
+      "errorOutput": "Error: webhook signature mismatch\n    at verifyWoo (src/webhooks/woo.ts:22:11)"
+    },
+    {
+      "id": "js-tracking-column",
+      "stack": "js",
+      "text": "Add a column for the courier tracking number.",
+      "expect": [
+        "o-migrations"
+      ],
+      "project": "orders-service"
+    },
+    {
+      "id": "js-esm-script",
+      "stack": "js",
+      "text": "My build script fails when it imports chalk.",
+      "expect": [
+        "ep-esm"
+      ],
+      "project": "tryon-web",
+      "errorOutput": "Error [ERR_REQUIRE_ESM]: require() of ES Module /Users/f/tryon-web/node_modules/chalk/source/index.js from /Users/f/tryon-web/scripts/build-models.js not supported."
+    },
+    {
+      "id": "js-retry-capture",
+      "stack": "js",
+      "text": "Should the client retry failed payment captures automatically?",
+      "expect": [
+        "g-retry"
+      ]
+    },
+    {
+      "id": "web-colour-picker",
+      "stack": "web",
+      "text": "Make the frame colour picker interactive.",
+      "expect": [
+        "n-router"
+      ],
+      "project": "tryon-web"
+    },
+    {
+      "id": "web-hydration",
+      "stack": "web",
+      "text": "The discount tag flickers and the console says hydration failed.",
+      "expect": [
+        "ep-hydration"
+      ],
+      "project": "tryon-web",
+      "errorOutput": "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client.\n  at DiscountTag (src/components/DiscountTag.tsx:20:5)"
+    },
+    {
+      "id": "web-window",
+      "stack": "web",
+      "text": "The page with the glasses canvas crashes during the build.",
+      "expect": [
+        "ep-window"
+      ],
+      "project": "tryon-web",
+      "errorOutput": "ReferenceError: window is not defined\n    at GlassesCanvas (src/components/GlassesCanvas.tsx:14:7)"
+    },
+    {
+      "id": "web-slow-phones",
+      "stack": "web",
+      "text": "The try-on page loads slowly on phones.",
+      "expect": [
+        "n-perf"
+      ],
+      "project": "tryon-web"
+    },
+    {
+      "id": "web-shop-embed",
+      "stack": "web",
+      "text": "A shop wants to put our try-on on their own website.",
+      "expect": [
+        "n-embed"
+      ],
+      "project": "tryon-web"
+    },
+    {
+      "id": "web-new-model",
+      "stack": "web",
+      "text": "Add a new glasses model to the viewer.",
+      "expect": [
+        "n-3d"
+      ],
+      "project": "tryon-web"
+    },
+    {
+      "id": "web-stripe-key",
+      "stack": "web",
+      "text": "Add the Stripe secret key to the config.",
+      "expect": [
+        "n-env",
+        "g-secrets"
+      ],
+      "project": "tryon-web"
+    },
+    {
+      "id": "web-video-privacy",
+      "stack": "web",
+      "text": "Is any camera video sent to our servers?",
+      "expect": [
+        "n-face"
+      ],
+      "project": "tryon-web"
+    },
+    {
+      "id": "web-cross-origin",
+      "stack": "web",
+      "text": "The widget can't read the host shop's cart.",
+      "expect": [
+        "ep-postmessage"
+      ],
+      "project": "tryon-web",
+      "errorOutput": "SecurityError: Failed to read a named property 'document' from 'Window': Blocked a frame with origin \"https://tryon.example\" from accessing a cross-origin frame."
+    },
+    {
+      "id": "web-pricing-table",
+      "stack": "web",
+      "text": "Style the new pricing table.",
+      "expect": [
+        "n-styling"
+      ],
+      "project": "tryon-web"
+    },
+    {
+      "id": "web-image-jump",
+      "stack": "web",
+      "text": "Product images make the page jump while they load.",
+      "expect": [
+        "g-images"
+      ]
+    },
+    {
+      "id": "gen-commit",
+      "stack": "general",
+      "text": "Write a commit message for this change.",
+      "expect": [
+        "g-commits"
+      ]
+    },
+    {
+      "id": "gen-csv-lib",
+      "stack": "general",
+      "text": "I'm adding a library to parse CSV files.",
+      "expect": [
+        "g-deps"
+      ]
+    },
+    {
+      "id": "gen-order-times",
+      "stack": "general",
+      "text": "Store the order time and show it to customers.",
+      "expect": [
+        "g-dates"
+      ],
+      "project": "orders-service"
+    }
+  ]
+}

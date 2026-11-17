@@ -1,0 +1,678 @@
+{
+  "kind": "extraction",
+  "name": "sessions",
+  "projects": [
+    {
+      "id": "eyewear-app",
+      "name": "eyewear-app",
+      "npm": {
+        "react-native": "0.77.1",
+        "expo": "52.0.11",
+        "zustand": "5.0.2"
+      }
+    },
+    {
+      "id": "optics-wp",
+      "name": "optics-wp",
+      "composer": {
+        "php": ">=8.1",
+        "wpackagist-plugin/woocommerce": "^9.4"
+      }
+    },
+    {
+      "id": "tax-api",
+      "name": "tax-api",
+      "composer": {
+        "php": "^8.3",
+        "laravel/framework": "^11.0",
+        "pestphp/pest": "^3.0"
+      }
+    },
+    {
+      "id": "tryon-web",
+      "name": "tryon-web",
+      "npm": {
+        "next": "15.1.0",
+        "react": "19.0.0",
+        "tailwindcss": "3.4.17"
+      }
+    },
+    {
+      "id": "orders-service",
+      "name": "orders-service",
+      "npm": {
+        "express": "5.0.1",
+        "pg": "8.13.1",
+        "pg-boss": "10.1.5"
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "id": "rn-strings-standing",
+      "stack": "rn",
+      "note": "A standing rule stated alongside a task.",
+      "steps": [
+        [
+          "user",
+          "From now on, every new screen's text goes in the i18n files, never hard-coded. Add a wishlist button to the product screen."
+        ],
+        [
+          "tool",
+          "read_file",
+          {
+            "path": "app/product/[id].tsx"
+          },
+          0,
+          "export default function ProductScreen() { ... }"
+        ],
+        [
+          "tool",
+          "edit_file",
+          {
+            "path": "app/product/[id].tsx"
+          },
+          0,
+          "edited"
+        ],
+        [
+          "tool",
+          "edit_file",
+          {
+            "path": "src/i18n/bs.json"
+          },
+          0,
+          "edited"
+        ],
+        [
+          "assistant",
+          "Added the wishlist button with its label in src/i18n/bs.json and en.json."
+        ],
+        [
+          "user",
+          "Looks good, thanks."
+        ]
+      ],
+      "expect": [
+        {
+          "match": "i18n|hard.?coded|translation|strings",
+          "kind": [
+            "preference",
+            "decision",
+            "convention"
+          ]
+        }
+      ],
+      "project": "eyewear-app"
+    },
+    {
+      "id": "rn-coupon-fix",
+      "stack": "rn",
+      "note": "A plain bug fix: nothing to remember beyond the fix itself.",
+      "steps": [
+        [
+          "user",
+          "The cart total is wrong when a coupon is applied. Fix it."
+        ],
+        [
+          "tool",
+          "run_command",
+          {
+            "command": "pnpm test"
+          },
+          1,
+          "FAIL src/cart/total.test.ts\n  ✕ applies a 10% coupon (4 ms)\n  Expected: 9000\n  Received: 9010"
+        ],
+        [
+          "tool",
+          "read_file",
+          {
+            "path": "src/cart/total.ts"
+          },
+          0,
+          "export function total(items, coupon) { ... }"
+        ],
+        [
+          "tool",
+          "edit_file",
+          {
+            "path": "src/cart/total.ts"
+          },
+          0,
+          "edited"
+        ],
+        [
+          "tool",
+          "run_command",
+          {
+            "command": "pnpm test"
+          },
+          0,
+          "Tests: 12 passed, 12 total"
+        ],
+        [
+          "assistant",
+          "The coupon was applied before shipping was added; it now applies to the items only. Tests pass."
+        ]
+      ],
+      "expect": [],
+      "project": "eyewear-app"
+    },
+    {
+      "id": "rn-run-tests",
+      "stack": "rn",
+      "note": "A task instruction that must not become a preference.",
+      "steps": [
+        [
+          "user",
+          "Run the tests and fix whatever fails."
+        ],
+        [
+          "tool",
+          "run_command",
+          {
+            "command": "pnpm test"
+          },
+          1,
+          "FAIL src/utils/price.test.ts\n  ✕ formats KM (3 ms)\n  Expected: \"12,00 KM\"\n  Received: \"12.00 KM\""
+        ],
+        [
+          "tool",
+          "edit_file",
+          {
+            "path": "src/utils/price.ts"
+          },
+          0,
+          "edited"
+        ],
+        [
+          "tool",
+          "run_command",
+          {
+            "command": "pnpm test"
+          },
+          0,
+          "Tests: 31 passed, 31 total"
+        ],
+        [
+          "assistant",
+          "One test failed: prices used a dot as the decimal separator. Fixed; all 31 tests pass."
+        ]
+      ],
+      "expect": [],
+      "project": "eyewear-app"
+    },
+    {
+      "id": "wp-shipping-decision",
+      "stack": "php",
+      "note": "A business decision stated by the user.",
+      "steps": [
+        [
+          "user",
+          "We decided: shipping to Croatia and Serbia costs a flat 15 KM, with no free-shipping threshold. Add that zone."
+        ],
+        [
+          "tool",
+          "read_file",
+          {
+            "path": "wp-content/plugins/optics-core/includes/shipping.php"
+          },
+          0,
+          "<?php function optics_shipping_zones() { ... }"
+        ],
+        [
+          "tool",
+          "edit_file",
+          {
+            "path": "wp-content/plugins/optics-core/includes/shipping.php"
+          },
+          0,
+          "edited"
+        ],
+        [
+          "assistant",
+          "Added a 'Croatia and Serbia' zone with a flat rate of 15 KM and no free-shipping threshold."
+        ]
+      ],
+      "expect": [
+        {
+          "match": "croatia|serbia|15 ?km",
+          "scope": "project",
+          "kind": [
+            "preference",
+            "decision",
+            "convention"
+          ]
+        }
+      ],
+      "project": "optics-wp"
+    },
+    {
+      "id": "wp-question-only",
+      "stack": "php",
+      "note": "A question; nothing to remember.",
+      "steps": [
+        [
+          "user",
+          "Don't change any files, just tell me where the lens prices come from."
+        ],
+        [
+          "tool",
+          "run_command",
+          {
+            "command": "grep -rn \"lens_price\" wp-content/plugins/optics-core"
+          },
+          0,
+          "includes/lens-pricing.php:12: function optics_lens_price( $option ) {"
+        ],
+        [
+          "assistant",
+          "Lens prices come from optics_lens_price() in includes/lens-pricing.php, which reads each add-on option's price."
+        ]
+      ],
+      "expect": [],
+      "project": "optics-wp"
+    },
+    {
+      "id": "lv-pest-global",
+      "stack": "php",
+      "note": "A preference for all PHP projects.",
+      "steps": [
+        [
+          "user",
+          "I prefer Pest's function style over PHPUnit classes in all my PHP projects. Write a test for the deductions endpoint."
+        ],
+        [
+          "tool",
+          "edit_file",
+          {
+            "path": "tests/Feature/DeductionsTest.php"
+          },
+          0,
+          "created"
+        ],
+        [
+          "tool",
+          "run_command",
+          {
+            "command": "php artisan test --filter=Deductions"
+          },
+          0,
+          "PASS  Tests\\Feature\\DeductionsTest\n✓ it lists deductions for the year\nTests:    1 passed (3 assertions)"
+        ],
+        [
+          "assistant",
+          "Added tests/Feature/DeductionsTest.php in Pest style; it passes."
+        ]
+      ],
+      "expect": [
+        {
+          "match": "pest",
+          "scope": "global",
+          "kind": [
+            "preference",
+            "decision",
+            "convention"
+          ]
+        }
+      ],
+      "project": "tax-api"
+    },
+    {
+      "id": "lv-research-middleware",
+      "stack": "php",
+      "note": "A fact learned from official docs.",
+      "steps": [
+        [
+          "user",
+          "Does Laravel 11 still have app/Http/Kernel.php for registering middleware?"
+        ],
+        [
+          "tool",
+          "fetch_page",
+          {
+            "url": "https://laravel.com/docs/11.x/middleware"
+          },
+          0,
+          "Middleware - Laravel 11.x\nRegistering Middleware\nGlobal Middleware\nIf you want a middleware to run during every HTTP request to your application, you may append it to the global middleware stack in your application's bootstrap/app.php file: ->withMiddleware(function (Middleware $middleware) { $middleware->append(EnsureTokenIsValid::class); })"
+        ],
+        [
+          "assistant",
+          "No. In Laravel 11 middleware is registered in bootstrap/app.php with ->withMiddleware(); the HTTP kernel class is gone."
+        ]
+      ],
+      "expect": [
+        {
+          "match": "bootstrap/app\\.php|withMiddleware|kernel",
+          "kind": "research"
+        }
+      ],
+      "project": "tax-api"
+    },
+    {
+      "id": "js-pgboss-decision",
+      "stack": "js",
+      "note": "A technical decision with its reason.",
+      "steps": [
+        [
+          "user",
+          "Use pg-boss for this, not BullMQ: we're not adding Redis to this service. Add a job that emails the customer when an order ships."
+        ],
+        [
+          "tool",
+          "edit_file",
+          {
+            "path": "src/jobs/ship-email.ts"
+          },
+          0,
+          "created"
+        ],
+        [
+          "tool",
+          "run_command",
+          {
+            "command": "pnpm test"
+          },
+          0,
+          "Test Files  9 passed (9)"
+        ],
+        [
+          "assistant",
+          "Added a pg-boss job, ship-email, queued when an order's status changes to shipped."
+        ]
+      ],
+      "expect": [
+        {
+          "match": "pg-?boss|redis|bullmq",
+          "scope": "project",
+          "kind": [
+            "preference",
+            "decision",
+            "convention"
+          ]
+        }
+      ],
+      "project": "orders-service"
+    },
+    {
+      "id": "js-secret-and-rule",
+      "stack": "js",
+      "note": "A password pasted in chat plus a real rule; the password must never be proposed.",
+      "steps": [
+        [
+          "user",
+          "Here's the staging DB password: Xk9#pLw2Qr7!vT. Connect and check why the orders list is slow. And always add an index when you add a foreign key."
+        ],
+        [
+          "tool",
+          "run_command",
+          {
+            "command": "psql \"$STAGING_URL\" -c \"EXPLAIN ANALYZE SELECT * FROM orders WHERE customer_id = 42\""
+          },
+          0,
+          "Seq Scan on orders  (cost=0.00..18334.00 rows=12 width=96) (actual time=0.031..92.4 rows=12 loops=1)"
+        ],
+        [
+          "tool",
+          "edit_file",
+          {
+            "path": "migrations/1731760000000_orders-customer-index.js"
+          },
+          0,
+          "created"
+        ],
+        [
+          "assistant",
+          "orders.customer_id had no index, so the list did a sequential scan. Added a migration that creates the index."
+        ]
+      ],
+      "expect": [
+        {
+          "match": "index",
+          "kind": [
+            "preference",
+            "decision",
+            "convention"
+          ]
+        }
+      ],
+      "project": "orders-service"
+    },
+    {
+      "id": "web-build-broke",
+      "stack": "web",
+      "note": "A frustrated one-off request.",
+      "steps": [
+        [
+          "user",
+          "Ugh, the build broke again. Fix it."
+        ],
+        [
+          "tool",
+          "run_command",
+          {
+            "command": "pnpm build"
+          },
+          1,
+          "Type error: Property 'onSelect' does not exist on type 'IntrinsicAttributes & FramePickerProps'.\n  src/app/try/page.tsx:41:22"
+        ],
+        [
+          "tool",
+          "edit_file",
+          {
+            "path": "src/components/FramePicker.tsx"
+          },
+          0,
+          "edited"
+        ],
+        [
+          "tool",
+          "run_command",
+          {
+            "command": "pnpm build"
+          },
+          0,
+          "✓ Compiled successfully"
+        ],
+        [
+          "assistant",
+          "FramePicker lost its onSelect prop in the last refactor; added it back. The build passes."
+        ]
+      ],
+      "expect": [],
+      "project": "tryon-web"
+    },
+    {
+      "id": "web-date-format",
+      "stack": "web",
+      "note": "A project-specific display rule.",
+      "steps": [
+        [
+          "user",
+          "In this project, every date shown to users uses the format 16. 11. 2026. Update the order history table."
+        ],
+        [
+          "tool",
+          "edit_file",
+          {
+            "path": "src/lib/format.ts"
+          },
+          0,
+          "edited"
+        ],
+        [
+          "tool",
+          "edit_file",
+          {
+            "path": "src/app/dashboard/orders/table.tsx"
+          },
+          0,
+          "edited"
+        ],
+        [
+          "assistant",
+          "Added formatDate() (dd. mm. yyyy) in src/lib/format.ts and used it in the order history table."
+        ]
+      ],
+      "expect": [
+        {
+          "match": "date",
+          "scope": "project",
+          "kind": [
+            "preference",
+            "decision",
+            "convention"
+          ]
+        }
+      ],
+      "project": "tryon-web"
+    },
+    {
+      "id": "gen-react-question",
+      "stack": "general",
+      "note": "A general question without a project.",
+      "steps": [
+        [
+          "user",
+          "What's the difference between useMemo and useCallback?"
+        ],
+        [
+          "assistant",
+          "useMemo caches a computed value; useCallback caches a function. useCallback(fn, deps) is useMemo(() => fn, deps)."
+        ]
+      ],
+      "expect": []
+    },
+    {
+      "id": "gen-answer-style",
+      "stack": "general",
+      "note": "Two global preferences in one message.",
+      "steps": [
+        [
+          "user",
+          "I always want short, to-the-point answers, and code comments in English. How do I debounce a function in JavaScript?"
+        ],
+        [
+          "assistant",
+          "Wrap it in a timer that resets on each call:\n\nfunction debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }"
+        ]
+      ],
+      "expect": [
+        {
+          "match": "short|concise|brief|to the point",
+          "scope": "global",
+          "kind": [
+            "preference",
+            "decision",
+            "convention"
+          ]
+        },
+        {
+          "match": "comment",
+          "scope": "global",
+          "kind": [
+            "preference",
+            "decision",
+            "convention"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rn-open-issue",
+      "stack": "rn",
+      "note": "An issue the user leaves open.",
+      "steps": [
+        [
+          "user",
+          "The Xiaomi push problem still isn't fixed. Leave it for now and add the order tracking screen."
+        ],
+        [
+          "tool",
+          "edit_file",
+          {
+            "path": "app/orders/[id]/tracking.tsx"
+          },
+          0,
+          "created"
+        ],
+        [
+          "assistant",
+          "Added the tracking screen with the courier status timeline. The Xiaomi push issue is untouched."
+        ]
+      ],
+      "expect": [
+        {
+          "match": "xiaomi|push",
+          "kind": "open_issue"
+        }
+      ],
+      "project": "eyewear-app"
+    },
+    {
+      "id": "web-assistant-suggestion",
+      "stack": "web",
+      "note": "Only the assistant suggested a change; the user didn't agree to it.",
+      "steps": [
+        [
+          "user",
+          "Add a loading state to the viewer."
+        ],
+        [
+          "tool",
+          "edit_file",
+          {
+            "path": "src/components/Viewer.tsx"
+          },
+          0,
+          "edited"
+        ],
+        [
+          "assistant",
+          "Added a skeleton while the model loads. By the way, I'd recommend moving the viewer state to Zustand."
+        ],
+        [
+          "user",
+          "ok thanks"
+        ]
+      ],
+      "expect": [],
+      "project": "tryon-web"
+    },
+    {
+      "id": "wp-no-page-builders",
+      "stack": "php",
+      "note": "A standing decision with a reason.",
+      "steps": [
+        [
+          "user",
+          "No more page builders on this site, ever: Elementor made it slow. Rebuild the About page with blocks."
+        ],
+        [
+          "tool",
+          "edit_file",
+          {
+            "path": "wp-content/themes/optics-child/patterns/about.php"
+          },
+          0,
+          "created"
+        ],
+        [
+          "assistant",
+          "Rebuilt the About page as a block pattern in the child theme; Elementor isn't used on it any more."
+        ]
+      ],
+      "expect": [
+        {
+          "match": "elementor|page builder",
+          "kind": [
+            "preference",
+            "decision",
+            "convention"
+          ]
+        }
+      ],
+      "project": "optics-wp"
+    }
+  ]
+}
